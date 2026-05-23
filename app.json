@@ -51,8 +51,9 @@
     ],
     "extra": {
       "eas": {
-        "projectId": ""
+        "projectId": "a331f253-70f0-40c9-9562-c9027bf60949"
       }
-    }
+    },
+    "owner": "j.nyoong"
   }
 }
