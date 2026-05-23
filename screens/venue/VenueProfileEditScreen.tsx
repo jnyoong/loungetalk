@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   SafeAreaView, StatusBar, TextInput, Alert,
@@ -14,6 +14,7 @@ import { Colors, Spacing, BorderRadius, Typography } from '../../constants/theme
 import { REGIONS, CATEGORIES } from '../../constants/regions';
 import AddressSearchModal, { type AddressResult } from '../../components/AddressSearchModal';
 import TimePickerModal from '../../components/TimePickerModal';
+import KeyboardDoneBar, { KEYBOARD_DONE_ID } from '../../components/KeyboardDoneBar';
 
 // ── 전화번호 유틸 ──────────────────────────────────────────────────────────
 function validatePhone(phone: string): boolean {
@@ -76,6 +77,18 @@ export default function VenueProfileEditScreen() {
   const [addressModalVisible, setAddressModalVisible] = useState(false);
   const [openTimePickerVisible, setOpenTimePickerVisible]   = useState(false);
   const [closeTimePickerVisible, setCloseTimePickerVisible] = useState(false);
+
+  // 키보드 포커스 체인용 ref
+  const nameEnRef   = useRef<TextInput>(null);
+  const addressDetailRef = useRef<TextInput>(null);
+  const phoneRef    = useRef<TextInput>(null);
+  const instagramRef = useRef<TextInput>(null);
+  const websiteRef  = useRef<TextInput>(null);
+  const feeWeekdayRef = useRef<TextInput>(null);
+  const feeWeekendRef = useRef<TextInput>(null);
+  const dressCodeRef = useRef<TextInput>(null);
+  const ageRef      = useRef<TextInput>(null);
+  const capacityRef = useRef<TextInput>(null);
 
   useEffect(() => { fetchVenue(); }, [profile]);
 
@@ -222,9 +235,15 @@ export default function VenueProfileEditScreen() {
           {/* ════════ 기본 정보 ════════════════════════════════ */}
           <SectionHeader title="기본 정보" />
           <View style={styles.block}>
-            <Field label="업장명" required value={name} onChangeText={setName} placeholder="라운지 ABC" />
+            <Field
+              label="업장명" required value={name} onChangeText={setName} placeholder="라운지 ABC"
+              onSubmitEditing={() => nameEnRef.current?.focus()}
+            />
             <Divider />
-            <Field label="영문명 (외국인용)" value={nameEn} onChangeText={setNameEn} placeholder="Lounge ABC" />
+            <Field
+              label="영문명 (외국인용)" value={nameEn} onChangeText={setNameEn} placeholder="Lounge ABC"
+              inputRef={nameEnRef} onSubmitEditing={() => phoneRef.current?.focus()}
+            />
             <Divider />
 
             {/* 주소 검색 */}
@@ -248,11 +267,15 @@ export default function VenueProfileEditScreen() {
               </TouchableOpacity>
               {address ? (
                 <TextInput
+                  ref={addressDetailRef}
                   style={styles.input}
                   value={addressDetail}
                   onChangeText={setAddressDetail}
                   placeholder="상세주소 (층, 호수 등)"
                   placeholderTextColor={Colors.textMuted}
+                  returnKeyType="next"
+                  onSubmitEditing={() => phoneRef.current?.focus()}
+                  inputAccessoryViewID={KEYBOARD_DONE_ID}
                   allowFontScaling={false}
                 />
               ) : null}
@@ -263,6 +286,7 @@ export default function VenueProfileEditScreen() {
             <View style={styles.fieldGroup}>
               <Text style={styles.label} allowFontScaling={false}>전화번호</Text>
               <TextInput
+                ref={phoneRef}
                 style={[styles.input, phoneError ? styles.inputError : null]}
                 value={phone}
                 onChangeText={handlePhoneChange}
@@ -270,6 +294,9 @@ export default function VenueProfileEditScreen() {
                 placeholderTextColor={Colors.textMuted}
                 keyboardType="phone-pad"
                 maxLength={14}
+                returnKeyType="next"
+                onSubmitEditing={() => instagramRef.current?.focus()}
+                inputAccessoryViewID={KEYBOARD_DONE_ID}
                 allowFontScaling={false}
               />
               {phoneError ? (
@@ -280,9 +307,15 @@ export default function VenueProfileEditScreen() {
             </View>
             <Divider />
 
-            <Field label="인스타그램 (@제외)" value={instagram} onChangeText={setInstagram} placeholder="lounge_abc" />
+            <Field
+              label="인스타그램 (@제외)" value={instagram} onChangeText={setInstagram} placeholder="lounge_abc"
+              inputRef={instagramRef} onSubmitEditing={() => websiteRef.current?.focus()}
+            />
             <Divider />
-            <Field label="웹사이트 URL" value={websiteUrl} onChangeText={setWebsiteUrl} placeholder="https://..." keyboardType="url" />
+            <Field
+              label="웹사이트 URL" value={websiteUrl} onChangeText={setWebsiteUrl} placeholder="https://..." keyboardType="url"
+              inputRef={websiteRef} returnKeyType="done"
+            />
           </View>
 
           {/* ════════ 운영 정보 ════════════════════════════════ */}
@@ -401,24 +434,31 @@ export default function VenueProfileEditScreen() {
                 <View style={styles.flex1}>
                   <Text style={styles.subLabel} allowFontScaling={false}>평일</Text>
                   <TextInput
+                    ref={feeWeekdayRef}
                     style={styles.input}
                     value={feeWeekday}
                     onChangeText={setFeeWeekday}
                     placeholder="20000"
                     placeholderTextColor={Colors.textMuted}
                     keyboardType="numeric"
+                    returnKeyType="next"
+                    onSubmitEditing={() => feeWeekendRef.current?.focus()}
+                    inputAccessoryViewID={KEYBOARD_DONE_ID}
                     allowFontScaling={false}
                   />
                 </View>
                 <View style={styles.flex1}>
                   <Text style={styles.subLabel} allowFontScaling={false}>주말</Text>
                   <TextInput
+                    ref={feeWeekendRef}
                     style={styles.input}
                     value={feeWeekend}
                     onChangeText={setFeeWeekend}
                     placeholder="30000"
                     placeholderTextColor={Colors.textMuted}
                     keyboardType="numeric"
+                    returnKeyType="done"
+                    inputAccessoryViewID={KEYBOARD_DONE_ID}
                     allowFontScaling={false}
                   />
                 </View>
@@ -429,7 +469,10 @@ export default function VenueProfileEditScreen() {
           {/* ════════ 상세 정보 ════════════════════════════════ */}
           <SectionHeader title="상세 정보" />
           <View style={styles.block}>
-            <Field label="드레스코드" value={dressCode} onChangeText={setDressCode} placeholder="스마트 캐주얼" />
+            <Field
+              label="드레스코드" value={dressCode} onChangeText={setDressCode} placeholder="스마트 캐주얼"
+              inputRef={dressCodeRef} onSubmitEditing={() => ageRef.current?.focus()}
+            />
             <Divider />
 
             <View style={styles.fieldGroup}>
@@ -437,6 +480,7 @@ export default function VenueProfileEditScreen() {
               <View style={styles.row2}>
                 <View style={{ width: 100 }}>
                   <TextInput
+                    ref={ageRef}
                     style={styles.input}
                     value={ageRestriction}
                     onChangeText={setAgeRestriction}
@@ -444,6 +488,9 @@ export default function VenueProfileEditScreen() {
                     placeholderTextColor={Colors.textMuted}
                     keyboardType="numeric"
                     maxLength={2}
+                    returnKeyType="next"
+                    onSubmitEditing={() => capacityRef.current?.focus()}
+                    inputAccessoryViewID={KEYBOARD_DONE_ID}
                     allowFontScaling={false}
                   />
                 </View>
@@ -457,12 +504,15 @@ export default function VenueProfileEditScreen() {
               <View style={styles.row2}>
                 <View style={{ width: 100 }}>
                   <TextInput
+                    ref={capacityRef}
                     style={styles.input}
                     value={capacity}
                     onChangeText={setCapacity}
                     placeholder="200"
                     placeholderTextColor={Colors.textMuted}
                     keyboardType="numeric"
+                    returnKeyType="done"
+                    inputAccessoryViewID={KEYBOARD_DONE_ID}
                     allowFontScaling={false}
                   />
                 </View>
@@ -483,6 +533,7 @@ export default function VenueProfileEditScreen() {
                   placeholderTextColor={Colors.textMuted}
                   onSubmitEditing={addGenre}
                   returnKeyType="done"
+                  inputAccessoryViewID={KEYBOARD_DONE_ID}
                   allowFontScaling={false}
                 />
                 <TouchableOpacity
@@ -532,6 +583,7 @@ export default function VenueProfileEditScreen() {
                 placeholderTextColor={Colors.textMuted}
                 multiline
                 maxLength={MAX_DESC}
+                inputAccessoryViewID={KEYBOARD_DONE_ID}
                 allowFontScaling={false}
               />
             </View>
@@ -545,6 +597,7 @@ export default function VenueProfileEditScreen() {
                 placeholder="Describe your venue in English"
                 placeholderTextColor={Colors.textMuted}
                 multiline
+                inputAccessoryViewID={KEYBOARD_DONE_ID}
                 allowFontScaling={false}
               />
             </View>
@@ -565,6 +618,8 @@ export default function VenueProfileEditScreen() {
           <View style={{ height: 100 }} />
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <KeyboardDoneBar />
 
       <AddressSearchModal
         visible={addressModalVisible}
@@ -605,9 +660,11 @@ function Divider() {
   return <View style={styles.divider} />;
 }
 
-function Field({ label, value, onChangeText, placeholder, keyboardType, required }: {
+function Field({ label, value, onChangeText, placeholder, keyboardType, required, returnKeyType, onSubmitEditing, inputRef }: {
   label: string; value: string; onChangeText: (t: string) => void;
   placeholder?: string; keyboardType?: any; required?: boolean;
+  returnKeyType?: any; onSubmitEditing?: () => void;
+  inputRef?: React.RefObject<TextInput | null>;
 }) {
   return (
     <View style={styles.fieldGroup}>
@@ -615,12 +672,16 @@ function Field({ label, value, onChangeText, placeholder, keyboardType, required
         {label}{required && <Text style={{ color: Colors.accent }}> *</Text>}
       </Text>
       <TextInput
+        ref={inputRef}
         style={styles.input}
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}
         placeholderTextColor={Colors.textMuted}
         keyboardType={keyboardType ?? 'default'}
+        returnKeyType={returnKeyType ?? 'next'}
+        onSubmitEditing={onSubmitEditing}
+        inputAccessoryViewID={KEYBOARD_DONE_ID}
         allowFontScaling={false}
       />
     </View>
