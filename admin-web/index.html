@@ -595,8 +595,16 @@ let allVenues = [];
 let editingVenueId = null;
 
 // ── 인증 ──────────────────────────────────────────────────────────
-onAuthStateChanged(auth, user => {
+const ADMIN_EMAIL = 'kahn201130@gmail.com';
+
+onAuthStateChanged(auth, async user => {
   if (user) {
+    // 관리자 이메일만 접근 허용
+    if (user.email !== ADMIN_EMAIL) {
+      await signOut(auth);
+      document.getElementById('login-error').textContent = '관리자 계정만 접근할 수 있습니다.';
+      return;
+    }
     document.getElementById('login-screen').style.display = 'none';
     document.getElementById('app').style.display = 'block';
     document.getElementById('admin-email-label').textContent = user.email;
