@@ -1,0 +1,55 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // 프로필: 본인만 쓰기, 전체 읽기
+    match /profiles/{userId} {
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // 업장: 전체 읽기, 소유자만 쓰기
+    match /venues/{venueId} {
+      allow read: if true;
+      allow create: if request.auth != null
+        && request.resource.data.owner_id == request.auth.uid;
+      allow update, delete: if request.auth != null
+        && resource.data.owner_id == request.auth.uid;
+    }
+
+    // 이벤트: 공개된 것만 읽기, 업장 소유자만 쓰기
+    match /venue_events/{eventId} {
+      allow read: if resource.data.is_published == true || (
+        request.auth != null &&
+        exists(/databases/$(database)/documents/venues/$(resource.data.venue_id)) &&
+        get(/databases/$(database)/documents/venues/$(resource.data.venue_id)).data.owner_id == request.auth.uid
+      );
+      allow write: if request.auth != null &&
+        exists(/databases/$(database)/documents/venues/$(request.resource.data.venue_id)) &&
+        get(/databases/$(database)/documents/venues/$(request.resource.data.venue_id)).data.owner_id == request.auth.uid;
+    }
+
+    // 예약: 본인 예약 읽기/쓰기 + 업장 소유자 읽기/수정
+    match /reservations/{resId} {
+      allow create: if request.auth != null
+        && request.resource.data.user_id == request.auth.uid;
+      allow read: if request.auth != null && (
+        resource.data.user_id == request.auth.uid ||
+        exists(/databases/$(database)/documents/venues/$(resource.data.venue_id)) &&
+        get(/databases/$(database)/documents/venues/$(resource.data.venue_id)).data.owner_id == request.auth.uid
+      );
+      allow update: if request.auth != null && (
+        resource.data.user_id == request.auth.uid ||
+        get(/databases/$(database)/documents/venues/$(resource.data.venue_id)).data.owner_id == request.auth.uid
+      );
+    }
+
+    // 즐겨찾기: 본인만
+    match /favorites/{favId} {
+      allow read, write: if request.auth != null
+        && request.auth.uid == resource.data.user_id;
+      allow create: if request.auth != null
+        && request.auth.uid == request.resource.data.user_id;
+    }
+  }
+}

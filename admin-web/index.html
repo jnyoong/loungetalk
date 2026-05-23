@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>라운지톡 관리자</title>
+  <style>
+    :root {
+      --bg: #0a0a0a;
+      --surface: #141414;
+      --surface2: #1c1c1c;
+      --border: rgba(255,255,255,0.08);
+      --accent: #7B61FF;
+      --accent-soft: rgba(123,97,255,0.12);
+      --text: #ffffff;
+      --text-sub: rgba(255,255,255,0.6);
+      --text-muted: rgba(255,255,255,0.35);
+      --success: #10B981;
+      --error: #EF4444;
+      --warning: #F59E0B;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: -apple-system, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif; font-size: 14px; min-height: 100vh; }
+
+    /* ── 로그인 ── */
+    #login-screen {
+      display: flex; align-items: center; justify-content: center;
+      min-height: 100vh; padding: 24px;
+    }
+    .login-box {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 16px; padding: 40px; width: 100%; max-width: 380px;
+    }
+    .login-logo { font-size: 22px; font-weight: 800; color: var(--accent); margin-bottom: 6px; }
+    .login-sub  { color: var(--text-muted); font-size: 13px; margin-bottom: 32px; }
+    .login-box input {
+      width: 100%; background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 8px; padding: 12px 14px; color: var(--text); font-size: 14px;
+      margin-bottom: 12px; outline: none;
+    }
+    .login-box input:focus { border-color: var(--accent); }
+    .btn-primary {
+      width: 100%; background: var(--accent); color: #fff; border: none;
+      border-radius: 8px; padding: 13px; font-size: 15px; font-weight: 700;
+      cursor: pointer; transition: opacity .15s;
+    }
+    .btn-primary:hover { opacity: .85; }
+    #login-error { color: var(--error); font-size: 13px; margin-top: 10px; text-align: center; }
+
+    /* ── 앱 레이아웃 ── */
+    #app { display: none; }
+    .layout { display: flex; min-height: 100vh; }
+    .sidebar {
+      width: 220px; background: var(--surface); border-right: 1px solid var(--border);
+      display: flex; flex-direction: column; position: fixed; top: 0; bottom: 0; left: 0;
+    }
+    .sidebar-logo {
+      padding: 24px 20px 16px; font-size: 17px; font-weight: 800;
+      color: var(--accent); border-bottom: 1px solid var(--border);
+    }
+    .sidebar-logo span { font-size: 11px; color: var(--text-muted); font-weight: 400; display: block; margin-top: 2px; }
+    .nav-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 12px 20px; color: var(--text-sub); cursor: pointer;
+      transition: all .15s; font-size: 14px; font-weight: 500;
+      border: none; background: none; width: 100%; text-align: left;
+    }
+    .nav-item:hover { background: var(--surface2); color: var(--text); }
+    .nav-item.active { background: var(--accent-soft); color: var(--accent); font-weight: 700; }
+    .nav-icon { font-size: 16px; width: 20px; text-align: center; }
+    .sidebar-bottom {
+      margin-top: auto; padding: 16px 20px;
+      border-top: 1px solid var(--border);
+    }
+    .btn-signout {
+      width: 100%; background: transparent; border: 1px solid var(--border);
+      border-radius: 8px; padding: 9px; color: var(--text-sub);
+      cursor: pointer; font-size: 13px; transition: all .15s;
+    }
+    .btn-signout:hover { border-color: var(--error); color: var(--error); }
+
+    .main { margin-left: 220px; padding: 32px; flex: 1; }
+    .page { display: none; }
+    .page.active { display: block; }
+    .page-title { font-size: 22px; font-weight: 800; margin-bottom: 6px; letter-spacing: -0.3px; }
+    .page-sub   { color: var(--text-muted); font-size: 13px; margin-bottom: 28px; }
+
+    /* ── 카드/테이블 공통 ── */
+    .card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px; padding: 20px; margin-bottom: 16px;
+    }
+    table { width: 100%; border-collapse: collapse; }
+    th { font-size: 11px; color: var(--text-muted); font-weight: 700; text-transform: uppercase;
+         letter-spacing: 1px; padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--border); }
+    td { padding: 13px 14px; border-bottom: 1px solid var(--border); color: var(--text-sub); vertical-align: middle; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: var(--surface2); }
+
+    .badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 700;
+    }
+    .badge-dot { width: 5px; height: 5px; border-radius: 50%; }
+    .badge-active   { background: rgba(16,185,129,.15); color: var(--success); }
+    .badge-inactive { background: rgba(107,114,128,.15); color: #6B7280; }
+    .badge-pending  { background: rgba(123,97,255,.15);  color: var(--accent); }
+    .badge-confirmed{ background: rgba(16,185,129,.15);  color: var(--success); }
+    .badge-cancelled{ background: rgba(107,114,128,.15); color: #6B7280; }
+
+    .btn { padding: 7px 14px; border-radius: 7px; font-size: 13px; font-weight: 600;
+           cursor: pointer; border: none; transition: opacity .15s; }
+    .btn:hover { opacity: .8; }
+    .btn-sm { padding: 5px 10px; font-size: 12px; }
+    .btn-accent   { background: var(--accent); color: #fff; }
+    .btn-ghost    { background: var(--surface2); color: var(--text-sub); border: 1px solid var(--border); }
+    .btn-danger   { background: rgba(239,68,68,.15); color: var(--error); border: 1px solid rgba(239,68,68,.25); }
+    .btn-success  { background: rgba(16,185,129,.15); color: var(--success); border: 1px solid rgba(16,185,129,.25); }
+
+    /* ── 폼 ── */
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .form-group { display: flex; flex-direction: column; gap: 6px; }
+    .form-group.full { grid-column: 1 / -1; }
+    label { font-size: 12px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: .8px; }
+    input[type=text], input[type=number], input[type=url], textarea, select {
+      background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;
+      padding: 10px 12px; color: var(--text); font-size: 14px; outline: none;
+      transition: border-color .15s;
+    }
+    input:focus, textarea:focus, select:focus { border-color: var(--accent); }
+    textarea { resize: vertical; min-height: 80px; }
+    select option { background: var(--surface2); }
+    .chip-row  { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+    .chip {
+      padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 600;
+      cursor: pointer; border: 1px solid var(--border); color: var(--text-muted);
+      background: transparent; transition: all .15s;
+    }
+    .chip.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+
+    /* ── 모달 ── */
+    .modal-backdrop {
+      display: none; position: fixed; inset: 0; background: rgba(0,0,0,.7);
+      z-index: 100; align-items: flex-start; justify-content: center; padding: 40px 16px; overflow-y: auto;
+    }
+    .modal-backdrop.open { display: flex; }
+    .modal {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 16px;
+      padding: 28px; width: 100%; max-width: 680px; margin: auto;
+    }
+    .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+    .modal-title  { font-size: 17px; font-weight: 700; }
+    .modal-close  { background: none; border: none; color: var(--text-muted); font-size: 20px; cursor: pointer; padding: 4px; }
+    .modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px; }
+
+    /* ── 대시보드 통계 ── */
+    .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 28px; }
+    .stat-card {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+      padding: 18px 20px;
+    }
+    .stat-val  { font-size: 30px; font-weight: 800; letter-spacing: -0.5px; }
+    .stat-label{ font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+
+    /* ── 검색 / 필터 ── */
+    .toolbar  { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+    .search-input {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+      padding: 9px 14px; color: var(--text); font-size: 14px; outline: none;
+      flex: 1; max-width: 300px;
+    }
+    .search-input:focus { border-color: var(--accent); }
+
+    .loading { text-align: center; color: var(--text-muted); padding: 60px 0; }
+    .empty   { text-align: center; color: var(--text-muted); padding: 60px 0; font-size: 15px; }
+  </style>
+</head>
+<body>
+
+<!-- ── 로그인 화면 ───────────────────────────────────────────────── -->
+<div id="login-screen">
+  <div class="login-box">
+    <div class="login-logo">라운지톡</div>
+    <div class="login-sub">관리자 전용 페이지</div>
+    <input type="email" id="login-email" placeholder="이메일" autocomplete="email">
+    <input type="password" id="login-pw" placeholder="비밀번호" autocomplete="current-password"
+           onkeydown="if(event.key==='Enter') doLogin()">
+    <button class="btn-primary" onclick="doLogin()">로그인</button>
+    <div id="login-error"></div>
+  </div>
+</div>
+
+<!-- ── 메인 앱 ────────────────────────────────────────────────────── -->
+<div id="app">
+  <div class="layout">
+
+    <!-- 사이드바 -->
+    <aside class="sidebar">
+      <div class="sidebar-logo">라운지톡 <span>Admin Console</span></div>
+      <nav>
+        <button class="nav-item active" onclick="showPage('dashboard')" data-page="dashboard">
+          <span class="nav-icon">📊</span> 대시보드
+        </button>
+        <button class="nav-item" onclick="showPage('venues')" data-page="venues">
+          <span class="nav-icon">🏢</span> 업장 관리
+        </button>
+        <button class="nav-item" onclick="showPage('reservations')" data-page="reservations">
+          <span class="nav-icon">📅</span> 예약 관리
+        </button>
+        <button class="nav-item" onclick="showPage('users')" data-page="users">
+          <span class="nav-icon">👥</span> 사용자
+        </button>
+      </nav>
+      <div class="sidebar-bottom">
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px" id="admin-email-label"></div>
+        <button class="btn-signout" onclick="doSignOut()">로그아웃</button>
+      </div>
+    </aside>
+
+    <!-- 콘텐츠 -->
+    <main class="main">
+
+      <!-- 대시보드 -->
+      <div class="page active" id="page-dashboard">
+        <div class="page-title">대시보드</div>
+        <div class="page-sub">전체 현황을 확인합니다</div>
+        <div class="stats-grid" id="stats-grid">
+          <div class="stat-card"><div class="stat-val" id="stat-venues">-</div><div class="stat-label">등록 업장</div></div>
+          <div class="stat-card"><div class="stat-val" id="stat-users">-</div><div class="stat-label">가입 사용자</div></div>
+          <div class="stat-card"><div class="stat-val" id="stat-reservations">-</div><div class="stat-label">전체 예약</div></div>
+          <div class="stat-card"><div class="stat-val" id="stat-pending">-</div><div class="stat-label">대기 중 예약</div></div>
+        </div>
+        <div class="card">
+          <div style="font-weight:700;margin-bottom:14px">최근 예약 (10건)</div>
+          <div id="recent-res-list"><div class="loading">로딩 중...</div></div>
+        </div>
+      </div>
+
+      <!-- 업장 관리 -->
+      <div class="page" id="page-venues">
+        <div class="page-title">업장 관리</div>
+        <div class="page-sub">업장 등록, 수정, 활성화 상태 관리</div>
+        <div class="toolbar">
+          <input class="search-input" type="text" placeholder="업장명 검색..." oninput="filterVenues(this.value)">
+          <button class="btn btn-accent" onclick="openVenueModal()">+ 업장 등록</button>
+        </div>
+        <div class="card" style="padding:0;overflow:hidden">
+          <table>
+            <thead>
+              <tr>
+                <th>업장명</th><th>지역</th><th>카테고리</th><th>사업주</th><th>상태</th><th>등록일</th><th>액션</th>
+              </tr>
+            </thead>
+            <tbody id="venues-tbody"><tr><td colspan="7" class="loading">로딩 중...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- 예약 관리 -->
+      <div class="page" id="page-reservations">
+        <div class="page-title">예약 관리</div>
+        <div class="page-sub">전체 업장 예약 현황</div>
+        <div class="toolbar">
+          <select id="res-status-filter" onchange="loadReservations()" style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 12px;color:var(--text);outline:none">
+            <option value="">전체 상태</option>
+            <option value="pending">대기 중</option>
+            <option value="confirmed">확정</option>
+            <option value="cancelled">취소</option>
+          </select>
+        </div>
+        <div class="card" style="padding:0;overflow:hidden">
+          <table>
+            <thead>
+              <tr><th>업장</th><th>예약자</th><th>방문일</th><th>인원</th><th>연락처</th><th>요청사항</th><th>상태</th><th>신청일</th></tr>
+            </thead>
+            <tbody id="res-tbody"><tr><td colspan="8" class="loading">로딩 중...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- 사용자 -->
+      <div class="page" id="page-users">
+        <div class="page-title">사용자 관리</div>
+        <div class="page-sub">가입한 사용자 목록</div>
+        <div class="card" style="padding:0;overflow:hidden">
+          <table>
+            <thead>
+              <tr><th>닉네임</th><th>이메일</th><th>역할</th><th>가입일</th></tr>
+            </thead>
+            <tbody id="users-tbody"><tr><td colspan="4" class="loading">로딩 중...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<!-- ── 업장 등록/수정 모달 ────────────────────────────────────────── -->
+<div class="modal-backdrop" id="venue-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="venue-modal-title">업장 등록</div>
+      <button class="modal-close" onclick="closeVenueModal()">✕</button>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:20px">
+      <!-- 기본 정보 -->
+      <div>
+        <div style="font-size:11px;color:var(--text-muted);font-weight:700;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:14px">기본 정보</div>
+        <div class="form-grid">
+          <div class="form-group"><label>업장명 *</label><input type="text" id="v-name" placeholder="업장 이름"></div>
+          <div class="form-group"><label>영문명</label><input type="text" id="v-name-en" placeholder="English Name"></div>
+          <div class="form-group full"><label>주소</label><input type="text" id="v-address" placeholder="도로명 주소"></div>
+          <div class="form-group full"><label>상세 주소</label><input type="text" id="v-address-detail" placeholder="동/호수 등"></div>
+          <div class="form-group"><label>전화번호</label><input type="text" id="v-phone" placeholder="02-1234-5678"></div>
+          <div class="form-group"><label>인스타그램</label><input type="text" id="v-instagram" placeholder="@handle"></div>
+          <div class="form-group full"><label>웹사이트</label><input type="url" id="v-website" placeholder="https://"></div>
+        </div>
+      </div>
+
+      <!-- 운영 정보 -->
+      <div>
+        <div style="font-size:11px;color:var(--text-muted);font-weight:700;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:14px">운영 정보</div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>지역</label>
+            <select id="v-region">
+              <option value="gangnam">강남</option><option value="cheongdam">청담</option>
+              <option value="apgujeong">압구정</option><option value="itaewon">이태원</option>
+              <option value="hongdae">홍대</option><option value="euljiro">을지로</option>
+              <option value="sinsa">신사</option><option value="yeouido">여의도</option>
+              <option value="seongsu">성수</option><option value="jongno">종로</option>
+              <option value="other">기타</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>카테고리 (복수 선택)</label>
+            <div class="chip-row" id="cat-chips">
+              <span class="chip" data-val="edm" onclick="toggleChip(this,'cat')">EDM 클럽</span>
+              <span class="chip" data-val="hiphop" onclick="toggleChip(this,'cat')">힙합 클럽</span>
+              <span class="chip" data-val="lounge" onclick="toggleChip(this,'cat')">라운지바</span>
+              <span class="chip" data-val="rooftop" onclick="toggleChip(this,'cat')">루프탑바</span>
+              <span class="chip" data-val="jazz" onclick="toggleChip(this,'cat')">재즈바</span>
+              <span class="chip" data-val="techno" onclick="toggleChip(this,'cat')">테크노</span>
+              <span class="chip" data-val="latin" onclick="toggleChip(this,'cat')">라틴/레게</span>
+              <span class="chip" data-val="kpop" onclick="toggleChip(this,'cat')">K-POP</span>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>영업일</label>
+            <div class="chip-row" id="day-chips">
+              <span class="chip" data-val="월" onclick="toggleChip(this,'day')">월</span>
+              <span class="chip" data-val="화" onclick="toggleChip(this,'day')">화</span>
+              <span class="chip" data-val="수" onclick="toggleChip(this,'day')">수</span>
+              <span class="chip" data-val="목" onclick="toggleChip(this,'day')">목</span>
+              <span class="chip" data-val="금" onclick="toggleChip(this,'day')">금</span>
+              <span class="chip" data-val="토" onclick="toggleChip(this,'day')">토</span>
+              <span class="chip" data-val="일" onclick="toggleChip(this,'day')">일</span>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>영업시간</label>
+            <div style="display:flex;gap:8px;align-items:center">
+              <input type="text" id="v-open-time"  placeholder="22:00" style="flex:1">
+              <span style="color:var(--text-muted)">—</span>
+              <input type="text" id="v-close-time" placeholder="다음날 06:00" style="flex:1">
+            </div>
+          </div>
+          <div class="form-group"><label>평일 입장료 (원)</label><input type="number" id="v-fee-weekday" placeholder="0"></div>
+          <div class="form-group"><label>주말 입장료 (원)</label><input type="number" id="v-fee-weekend" placeholder="0"></div>
+        </div>
+      </div>
+
+      <!-- 상세 정보 -->
+      <div>
+        <div style="font-size:11px;color:var(--text-muted);font-weight:700;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:14px">상세 정보</div>
+        <div class="form-grid">
+          <div class="form-group"><label>드레스 코드</label><input type="text" id="v-dress-code" placeholder="스마트 캐주얼"></div>
+          <div class="form-group"><label>나이 제한</label><input type="number" id="v-age" placeholder="19"></div>
+          <div class="form-group"><label>수용 인원</label><input type="number" id="v-capacity" placeholder="200"></div>
+          <div class="form-group"><label>음악 장르 (쉼표로 구분)</label><input type="text" id="v-genres" placeholder="Hip-Hop, R&B"></div>
+          <div class="form-group full"><label>소개 (한국어, 300자)</label><textarea id="v-desc" maxlength="300" placeholder="업장 소개를 입력하세요"></textarea></div>
+          <div class="form-group full"><label>소개 (English)</label><textarea id="v-desc-en" placeholder="English description"></textarea></div>
+        </div>
+      </div>
+
+      <!-- 활성화 -->
+      <div style="display:flex;align-items:center;gap:12px">
+        <label style="font-size:14px;text-transform:none;letter-spacing:0;color:var(--text);cursor:pointer" for="v-active">
+          <input type="checkbox" id="v-active" checked style="width:16px;height:16px;margin-right:6px;accent-color:var(--accent)">
+          업장 활성화 (앱에 노출)
+        </label>
+        <label style="font-size:14px;text-transform:none;letter-spacing:0;color:var(--text);cursor:pointer" for="v-verified">
+          <input type="checkbox" id="v-verified" style="width:16px;height:16px;margin-right:6px;accent-color:var(--accent)">
+          인증 업장 뱃지
+        </label>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeVenueModal()">취소</button>
+      <button class="btn btn-accent" onclick="saveVenue()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Firebase SDK ── -->
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
+import {
+  getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged
+} from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
+import {
+  getFirestore, collection, getDocs, doc, addDoc, updateDoc, setDoc,
+  query, orderBy, limit, serverTimestamp, where
+} from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
+
+// ── Firebase 설정 ──────────────────────────────────────────────────
+const firebaseConfig = {
+  apiKey:            "AIzaSyDVEgs7lrzGLJBCUODOuX0JmxIa4TCYpEg",
+  authDomain:        "lounge-35d0a.firebaseapp.com",
+  projectId:         "lounge-35d0a",
+  storageBucket:     "lounge-35d0a.firebasestorage.app",
+  messagingSenderId: "885778472477",
+  appId:             "1:885778472477:web:cb49b28058adb8d141b0f4",
+};
+
+const app  = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db   = getFirestore(app);
+
+// ── 지역/카테고리 맵 ───────────────────────────────────────────────
+const REGION_LABEL = { gangnam:'강남', cheongdam:'청담', apgujeong:'압구정', itaewon:'이태원',
+  hongdae:'홍대', euljiro:'을지로', sinsa:'신사', yeouido:'여의도', seongsu:'성수', jongno:'종로', other:'기타' };
+const CAT_LABEL = { edm:'EDM클럽', hiphop:'힙합', lounge:'라운지바', rooftop:'루프탑',
+  jazz:'재즈바', techno:'테크노', latin:'라틴', kpop:'K-POP' };
+
+// ── 상태 변수 ──────────────────────────────────────────────────────
+let allVenues = [];
+let editingVenueId = null;
+
+// ── 인증 ──────────────────────────────────────────────────────────
+onAuthStateChanged(auth, user => {
+  if (user) {
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    document.getElementById('admin-email-label').textContent = user.email;
+    loadDashboard();
+    loadVenues();
+    loadUsers();
+  } else {
+    document.getElementById('login-screen').style.display = 'flex';
+    document.getElementById('app').style.display = 'none';
+  }
+});
+
+window.doLogin = async () => {
+  const email = document.getElementById('login-email').value;
+  const pw    = document.getElementById('login-pw').value;
+  const errEl = document.getElementById('login-error');
+  errEl.textContent = '';
+  try {
+    await signInWithEmailAndPassword(auth, email, pw);
+  } catch (e) {
+    errEl.textContent = '이메일 또는 비밀번호가 올바르지 않습니다.';
+  }
+};
+
+window.doSignOut = async () => {
+  if (confirm('로그아웃 하시겠어요?')) await signOut(auth);
+};
+
+// ── 페이지 전환 ───────────────────────────────────────────────────
+window.showPage = (name) => {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  document.querySelector(`[data-page="${name}"]`).classList.add('active');
+  if (name === 'reservations') loadReservations();
+};
+
+// ── 대시보드 ──────────────────────────────────────────────────────
+async function loadDashboard() {
+  const [vSnap, uSnap, rSnap] = await Promise.all([
+    getDocs(collection(db, 'venues')),
+    getDocs(collection(db, 'profiles')),
+    getDocs(collection(db, 'reservations')),
+  ]);
+  const res = rSnap.docs.map(d => d.data());
+  document.getElementById('stat-venues').textContent       = vSnap.size;
+  document.getElementById('stat-users').textContent        = uSnap.size;
+  document.getElementById('stat-reservations').textContent = rSnap.size;
+  document.getElementById('stat-pending').textContent      = res.filter(r => r.status === 'pending').length;
+
+  // 최근 예약 10건
+  const venueMap = {};
+  vSnap.docs.forEach(d => { venueMap[d.id] = d.data().name; });
+  const recent = rSnap.docs
+    .map(d => ({ id: d.id, ...d.data() }))
+    .sort((a, b) => (b.created_at?.seconds ?? 0) - (a.created_at?.seconds ?? 0))
+    .slice(0, 10);
+  document.getElementById('recent-res-list').innerHTML = recent.length === 0
+    ? '<div class="empty">예약 없음</div>'
+    : `<table><thead><tr><th>업장</th><th>예약자</th><th>방문일</th><th>인원</th><th>상태</th></tr></thead><tbody>
+        ${recent.map(r => `<tr>
+          <td>${venueMap[r.venue_id] ?? '-'}</td>
+          <td>${r.contact_name}</td>
+          <td>${r.reservation_date}</td>
+          <td>${r.party_size}명</td>
+          <td>${statusBadge(r.status)}</td>
+        </tr>`).join('')}
+      </tbody></table>`;
+}
+
+// ── 업장 목록 ─────────────────────────────────────────────────────
+async function loadVenues() {
+  const snap = await getDocs(collection(db, 'venues'));
+  allVenues = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  renderVenues(allVenues);
+}
+
+function renderVenues(list) {
+  const tbody = document.getElementById('venues-tbody');
+  if (!list.length) { tbody.innerHTML = '<tr><td colspan="7" class="empty">업장 없음</td></tr>'; return; }
+  tbody.innerHTML = list.map(v => `
+    <tr>
+      <td><strong>${v.name}</strong>${v.name_en ? `<br><small style="color:var(--text-muted)">${v.name_en}</small>` : ''}</td>
+      <td>${REGION_LABEL[v.region] ?? v.region ?? '-'}</td>
+      <td>${(v.categories ?? []).map(c => CAT_LABEL[c] ?? c).join(', ') || '-'}</td>
+      <td style="font-size:12px;color:var(--text-muted)">${v.owner_id ? v.owner_id.slice(0,8)+'…' : '미등록'}</td>
+      <td>${v.is_active
+          ? '<span class="badge badge-active"><span class="badge-dot" style="background:var(--success)"></span>활성</span>'
+          : '<span class="badge badge-inactive"><span class="badge-dot" style="background:#6B7280"></span>비활성</span>'}</td>
+      <td style="font-size:12px;color:var(--text-muted)">${v.created_at?.seconds ? new Date(v.created_at.seconds*1000).toLocaleDateString('ko') : '-'}</td>
+      <td>
+        <button class="btn btn-sm btn-ghost" onclick="editVenue('${v.id}')">수정</button>
+        <button class="btn btn-sm ${v.is_active ? 'btn-danger' : 'btn-success'}" style="margin-left:4px"
+          onclick="toggleActive('${v.id}', ${v.is_active})">
+          ${v.is_active ? '비활성화' : '활성화'}
+        </button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+window.filterVenues = (q) => {
+  const filtered = q.trim()
+    ? allVenues.filter(v => v.name?.includes(q) || v.name_en?.toLowerCase().includes(q.toLowerCase()))
+    : allVenues;
+  renderVenues(filtered);
+};
+
+window.toggleActive = async (id, current) => {
+  if (!confirm(`${current ? '비활성화' : '활성화'} 하시겠어요?`)) return;
+  await updateDoc(doc(db, 'venues', id), { is_active: !current });
+  loadVenues();
+};
+
+// ── 업장 모달 ─────────────────────────────────────────────────────
+window.openVenueModal = (venue = null) => {
+  editingVenueId = venue?.id ?? null;
+  document.getElementById('venue-modal-title').textContent = venue ? '업장 수정' : '업장 등록';
+
+  // 폼 초기화 / 데이터 채우기
+  const fields = ['name','name_en','address','address_detail','phone','instagram',
+                  'website','open_time','close_time','fee_weekday','fee_weekend',
+                  'dress_code','age','capacity','genres','desc','desc_en'];
+  const idMap = { 'name':'v-name','name_en':'v-name-en','address':'v-address',
+    'address_detail':'v-address-detail','phone':'v-phone','instagram':'v-instagram',
+    'website':'v-website','open_time':'v-open-time','close_time':'v-close-time',
+    'fee_weekday':'v-fee-weekday','fee_weekend':'v-fee-weekend','dress_code':'v-dress-code',
+    'age':'v-age','capacity':'v-capacity','genres':'v-genres','desc':'v-desc','desc_en':'v-desc-en' };
+
+  const dataMap = venue ? {
+    name: venue.name ?? '', 'name_en': venue.name_en ?? '',
+    address: venue.address ?? '', address_detail: venue.address_detail ?? '',
+    phone: venue.phone ?? '', instagram: venue.instagram_handle ?? '',
+    website: venue.website_url ?? '', open_time: venue.open_time ?? '',
+    close_time: venue.close_time ?? '', fee_weekday: venue.entrance_fee_weekday ?? '',
+    fee_weekend: venue.entrance_fee_weekend ?? '', dress_code: venue.dress_code ?? '',
+    age: venue.age_restriction ?? 19, capacity: venue.capacity ?? '',
+    genres: (venue.music_genres ?? []).join(', '),
+    desc: venue.description ?? '', desc_en: venue.description_en ?? '',
+  } : {};
+
+  fields.forEach(f => {
+    const el = document.getElementById(idMap[f]);
+    if (el) el.value = dataMap[f] ?? '';
+  });
+  if (venue) {
+    document.getElementById('v-region').value = venue.region ?? 'gangnam';
+  }
+  document.getElementById('v-active').checked   = venue ? !!venue.is_active   : true;
+  document.getElementById('v-verified').checked = venue ? !!venue.is_verified : false;
+
+  // 칩 초기화
+  document.querySelectorAll('#cat-chips .chip').forEach(c => {
+    c.classList.toggle('on', (venue?.categories ?? []).includes(c.dataset.val));
+  });
+  document.querySelectorAll('#day-chips .chip').forEach(c => {
+    c.classList.toggle('on', (venue?.open_days ?? []).includes(c.dataset.val));
+  });
+
+  document.getElementById('venue-modal').classList.add('open');
+};
+
+window.editVenue = (id) => {
+  const v = allVenues.find(v => v.id === id);
+  if (v) openVenueModal(v);
+};
+
+window.closeVenueModal = () => {
+  document.getElementById('venue-modal').classList.remove('open');
+  editingVenueId = null;
+};
+
+window.toggleChip = (el, group) => { el.classList.toggle('on'); };
+
+window.saveVenue = async () => {
+  const name = document.getElementById('v-name').value.trim();
+  if (!name) { alert('업장명을 입력하세요'); return; }
+
+  const cats = [...document.querySelectorAll('#cat-chips .chip.on')].map(c => c.dataset.val);
+  const days = [...document.querySelectorAll('#day-chips .chip.on')].map(c => c.dataset.val);
+  const genres = document.getElementById('v-genres').value
+    .split(',').map(s => s.trim()).filter(Boolean);
+  const slug = name.toLowerCase().replace(/[^a-z0-9가-힣]/g, '-');
+
+  const data = {
+    name,
+    name_en:               document.getElementById('v-name-en').value.trim() || null,
+    slug,
+    region:                document.getElementById('v-region').value,
+    categories:            cats,
+    address:               document.getElementById('v-address').value.trim(),
+    address_detail:        document.getElementById('v-address-detail').value.trim() || null,
+    phone:                 document.getElementById('v-phone').value.trim() || null,
+    instagram_handle:      document.getElementById('v-instagram').value.trim() || null,
+    instagram_connected:   false,
+    website_url:           document.getElementById('v-website').value.trim() || null,
+    open_days:             days,
+    open_time:             document.getElementById('v-open-time').value.trim() || null,
+    close_time:            document.getElementById('v-close-time').value.trim() || null,
+    entrance_fee_weekday:  parseInt(document.getElementById('v-fee-weekday').value) || null,
+    entrance_fee_weekend:  parseInt(document.getElementById('v-fee-weekend').value) || null,
+    dress_code:            document.getElementById('v-dress-code').value.trim() || null,
+    age_restriction:       parseInt(document.getElementById('v-age').value) || 19,
+    capacity:              parseInt(document.getElementById('v-capacity').value) || null,
+    music_genres:          genres,
+    description:           document.getElementById('v-desc').value.trim() || null,
+    description_en:        document.getElementById('v-desc-en').value.trim() || null,
+    cover_image_url:       null,
+    images:                [],
+    is_active:             document.getElementById('v-active').checked,
+    is_verified:           document.getElementById('v-verified').checked,
+    owner_id:              null,
+    updated_at:            serverTimestamp(),
+  };
+
+  try {
+    if (editingVenueId) {
+      await updateDoc(doc(db, 'venues', editingVenueId), data);
+    } else {
+      await addDoc(collection(db, 'venues'), { ...data, created_at: serverTimestamp() });
+    }
+    closeVenueModal();
+    loadVenues();
+    alert(editingVenueId ? '수정되었습니다.' : '업장이 등록되었습니다.');
+  } catch (e) {
+    alert('저장 실패: ' + e.message);
+  }
+};
+
+// ── 예약 목록 ─────────────────────────────────────────────────────
+window.loadReservations = async () => {
+  const status = document.getElementById('res-status-filter').value;
+  const snap = await getDocs(collection(db, 'reservations'));
+  const vSnap = await getDocs(collection(db, 'venues'));
+  const venueMap = {};
+  vSnap.docs.forEach(d => { venueMap[d.id] = d.data().name; });
+
+  let list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  if (status) list = list.filter(r => r.status === status);
+  list.sort((a, b) => (b.created_at?.seconds ?? 0) - (a.created_at?.seconds ?? 0));
+
+  const tbody = document.getElementById('res-tbody');
+  if (!list.length) { tbody.innerHTML = '<tr><td colspan="8" class="empty">예약 없음</td></tr>'; return; }
+  tbody.innerHTML = list.map(r => `
+    <tr>
+      <td>${venueMap[r.venue_id] ?? '-'}</td>
+      <td><strong>${r.contact_name}</strong></td>
+      <td>${r.reservation_date}</td>
+      <td>${r.party_size}명</td>
+      <td>${r.contact_phone}</td>
+      <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.special_requests ?? '-'}</td>
+      <td>${statusBadge(r.status)}</td>
+      <td style="font-size:12px;color:var(--text-muted)">${r.created_at?.seconds ? new Date(r.created_at.seconds*1000).toLocaleDateString('ko') : '-'}</td>
+    </tr>
+  `).join('');
+};
+
+// ── 사용자 목록 ───────────────────────────────────────────────────
+async function loadUsers() {
+  const snap = await getDocs(collection(db, 'profiles'));
+  const list = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+    .sort((a, b) => (b.created_at?.seconds ?? 0) - (a.created_at?.seconds ?? 0));
+  const tbody = document.getElementById('users-tbody');
+  if (!list.length) { tbody.innerHTML = '<tr><td colspan="4" class="empty">사용자 없음</td></tr>'; return; }
+  tbody.innerHTML = list.map(u => `
+    <tr>
+      <td><strong>${u.nickname}</strong></td>
+      <td style="color:var(--text-muted)">${u.email}</td>
+      <td>${u.role === 'venue_owner' ? '<span class="badge badge-confirmed">사업주</span>' : '<span class="badge badge-inactive">소비자</span>'}</td>
+      <td style="font-size:12px;color:var(--text-muted)">${u.created_at?.seconds ? new Date(u.created_at.seconds*1000).toLocaleDateString('ko') : '-'}</td>
+    </tr>
+  `).join('');
+}
+
+// ── 유틸 ──────────────────────────────────────────────────────────
+function statusBadge(s) {
+  const map = { pending:'<span class="badge badge-pending">대기</span>', confirmed:'<span class="badge badge-confirmed">확정</span>', cancelled:'<span class="badge badge-cancelled">취소</span>' };
+  return map[s] ?? s;
+}
+
+// 모달 바깥 클릭 닫기
+document.getElementById('venue-modal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeVenueModal();
+});
+</script>
+</body>
+</html>
