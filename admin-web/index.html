@@ -173,6 +173,34 @@
 
     .loading { text-align: center; color: var(--text-muted); padding: 60px 0; }
     .empty   { text-align: center; color: var(--text-muted); padding: 60px 0; font-size: 15px; }
+
+    /* ── 분석 차트 ── */
+    .bar-row  { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+    .bar-label{ width:70px; font-size:12px; color:var(--text-muted); flex-shrink:0; text-align:right; }
+    .bar-track{ flex:1; background:var(--surface2); border-radius:4px; height:20px; overflow:hidden; }
+    .bar-fill { height:100%; border-radius:4px; background:var(--accent); transition:width .4s; }
+    .bar-val  { width:44px; font-size:12px; color:var(--text); text-align:right; flex-shrink:0; }
+    .bar-fill-green  { background: var(--success); }
+    .bar-fill-gold   { background: #F59E0B; }
+    .bar-fill-orange { background: #F97316; }
+
+    .funnel-row { display:flex; align-items:center; gap:12px; margin-bottom:10px; }
+    .funnel-label { font-size:13px; color:var(--text-muted); width:110px; flex-shrink:0; }
+    .funnel-count { font-size:20px; font-weight:800; color:var(--text); width:60px; }
+    .funnel-pct   { font-size:12px; color:var(--text-muted); }
+    .funnel-arrow { color:var(--text-muted); font-size:12px; text-align:center; margin:2px 0 6px 0; }
+
+    .rank-row { display:flex; align-items:center; gap:10px; padding:6px 0; border-bottom:1px solid var(--border); }
+    .rank-row:last-child { border-bottom:none; }
+    .rank-num { width:22px; height:22px; border-radius:50%; background:var(--surface2); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; color:var(--text-muted); flex-shrink:0; }
+    .rank-num.top3 { background:var(--accent); color:#fff; }
+    .rank-name { flex:1; font-size:13px; color:var(--text); }
+    .rank-val  { font-size:13px; font-weight:700; color:var(--accent); }
+
+    .insight-row { display:flex; gap:10px; align-items:flex-start; margin-bottom:12px; }
+    .insight-icon { font-size:18px; flex-shrink:0; }
+    .insight-text { font-size:13px; color:var(--text-sub); line-height:1.6; }
+    .insight-text strong { color:var(--text); }
   </style>
 </head>
 <body>
@@ -200,6 +228,9 @@
       <nav>
         <button class="nav-item active" onclick="showPage('dashboard')" data-page="dashboard">
           <span class="nav-icon">📊</span> 대시보드
+        </button>
+        <button class="nav-item" onclick="showPage('analytics')" data-page="analytics">
+          <span class="nav-icon">📈</span> 분석
         </button>
         <button class="nav-item" onclick="showPage('approvals')" data-page="approvals">
           <span class="nav-icon">✅</span> 사업주 승인
@@ -280,6 +311,93 @@
             <tbody id="res-tbody"><tr><td colspan="8" class="loading">로딩 중...</td></tr></tbody>
           </table>
         </div>
+      </div>
+
+      <!-- 분석 -->
+      <div class="page" id="page-analytics">
+        <div class="page-title">분석 대시보드</div>
+        <div class="page-sub">업장 조회·예약·검색 데이터 분석</div>
+
+        <!-- 기간 필터 -->
+        <div class="toolbar" style="margin-bottom:20px">
+          <div style="font-size:13px;color:var(--text-muted);margin-right:8px">기간:</div>
+          <button class="btn btn-accent btn-sm period-btn" data-days="1" onclick="setPeriod(1)">오늘</button>
+          <button class="btn btn-ghost btn-sm period-btn" data-days="7" onclick="setPeriod(7)">7일</button>
+          <button class="btn btn-ghost btn-sm period-btn" data-days="30" onclick="setPeriod(30)">30일</button>
+          <button class="btn btn-ghost btn-sm period-btn" data-days="9999" onclick="setPeriod(9999)">전체</button>
+          <button class="btn btn-ghost btn-sm" style="margin-left:auto" onclick="loadAnalytics()">↻ 새로고침</button>
+        </div>
+
+        <!-- 핵심 지표 -->
+        <div class="stats-grid" style="grid-template-columns:repeat(5,1fr);margin-bottom:20px" id="analytics-stats">
+          <div class="stat-card"><div class="stat-val" id="an-views">-</div><div class="stat-label">업장 조회수</div></div>
+          <div class="stat-card"><div class="stat-val" id="an-res">-</div><div class="stat-label">예약 완료</div></div>
+          <div class="stat-card"><div class="stat-val" id="an-conv" style="color:var(--success)">-</div><div class="stat-label">조회→예약 전환율</div></div>
+          <div class="stat-card"><div class="stat-val" id="an-search">-</div><div class="stat-label">검색 횟수</div></div>
+          <div class="stat-card"><div class="stat-val" id="an-fav">-</div><div class="stat-label">즐겨찾기 추가</div></div>
+        </div>
+
+        <!-- 2단 레이아웃 -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+
+          <!-- 인기 업장 TOP 10 -->
+          <div class="card">
+            <div style="font-weight:700;font-size:14px;margin-bottom:14px">🏆 인기 업장 TOP 10 (조회수)</div>
+            <div id="an-venue-rank"><div class="loading">집계 중...</div></div>
+          </div>
+
+          <!-- 지역별 조회 -->
+          <div class="card">
+            <div style="font-weight:700;font-size:14px;margin-bottom:14px">📍 지역별 조회</div>
+            <div id="an-region-chart"><div class="loading">집계 중...</div></div>
+          </div>
+
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+
+          <!-- 카테고리 인기도 -->
+          <div class="card">
+            <div style="font-weight:700;font-size:14px;margin-bottom:14px">🎵 카테고리 인기도</div>
+            <div id="an-cat-chart"><div class="loading">집계 중...</div></div>
+          </div>
+
+          <!-- 시간대별 활동 -->
+          <div class="card">
+            <div style="font-weight:700;font-size:14px;margin-bottom:14px">⏰ 시간대별 조회 (24h)</div>
+            <div id="an-hour-chart"><div class="loading">집계 중...</div></div>
+          </div>
+
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+
+          <!-- 예약 퍼널 -->
+          <div class="card">
+            <div style="font-weight:700;font-size:14px;margin-bottom:14px">🔽 예약 퍼널</div>
+            <div id="an-funnel"><div class="loading">집계 중...</div></div>
+          </div>
+
+          <!-- 인기 검색어 -->
+          <div class="card">
+            <div style="font-weight:700;font-size:14px;margin-bottom:14px">🔍 인기 검색어 TOP 20</div>
+            <div id="an-search-rank"><div class="loading">집계 중...</div></div>
+          </div>
+
+        </div>
+
+        <!-- 전체 업장 성과표 -->
+        <div class="card" style="margin-bottom:16px">
+          <div style="font-weight:700;font-size:14px;margin-bottom:14px">📊 업장별 성과 전체</div>
+          <div id="an-venue-table"><div class="loading">집계 중...</div></div>
+        </div>
+
+        <!-- 수익화 인사이트 -->
+        <div class="card" style="border-color:rgba(123,97,255,0.3)">
+          <div style="font-weight:700;font-size:14px;margin-bottom:14px;color:var(--accent)">💰 수익화 인사이트</div>
+          <div id="an-monetize"><div class="loading">분석 중...</div></div>
+        </div>
+
       </div>
 
       <!-- 사업주 승인 -->
@@ -516,6 +634,7 @@ window.showPage = (name) => {
   document.querySelector(`[data-page="${name}"]`).classList.add('active');
   if (name === 'reservations') loadReservations();
   if (name === 'approvals') loadApprovals();
+  if (name === 'analytics') loadAnalytics();
 };
 
 // ── 대시보드 ──────────────────────────────────────────────────────
@@ -841,6 +960,282 @@ async function loadUsers() {
     </tr>
   `).join('');
 }
+
+// ── 분석 ──────────────────────────────────────────────────────────
+let analyticsPeriodDays = 1;
+
+window.setPeriod = (days) => {
+  analyticsPeriodDays = days;
+  document.querySelectorAll('.period-btn').forEach(b => {
+    b.className = 'btn btn-sm period-btn ' +
+      (parseInt(b.dataset.days) === days ? 'btn-accent' : 'btn-ghost');
+  });
+  loadAnalytics();
+};
+
+window.loadAnalytics = async () => {
+  // 기간 계산
+  const cutoff = new Date();
+  if (analyticsPeriodDays < 9000) {
+    cutoff.setDate(cutoff.getDate() - analyticsPeriodDays);
+  } else {
+    cutoff.setFullYear(2000);
+  }
+  const cutoffSec = cutoff.getTime() / 1000;
+
+  // analytics_events 전체 로드 (최근 3000건)
+  const [evSnap, vSnap] = await Promise.all([
+    getDocs(collection(db, 'analytics_events')),
+    getDocs(collection(db, 'venues')),
+  ]);
+
+  const allVenueMap = {};
+  vSnap.docs.forEach(d => { allVenueMap[d.id] = { ...d.data(), id: d.id }; });
+  const venueList = vSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+  // 기간 필터
+  const events = evSnap.docs
+    .map(d => ({ id: d.id, ...d.data() }))
+    .filter(e => (e.created_at?.seconds ?? 0) >= cutoffSec);
+
+  // ── 집계 ───────────────────────────────────────────────────────
+  const byType = {};
+  const byVenue = {}; // venue_id → {views, res_start, res_complete, fav, insta, phone}
+  const byRegion = {};
+  const byCat = {};
+  const byHour = Array(24).fill(0);
+  const searchMap = {};
+
+  events.forEach(e => {
+    byType[e.type] = (byType[e.type] || 0) + 1;
+
+    if (e.venue_id) {
+      if (!byVenue[e.venue_id]) byVenue[e.venue_id] = { views:0, res_start:0, res:0, fav:0, insta:0, phone:0 };
+      if (e.type === 'venue_view')           byVenue[e.venue_id].views++;
+      if (e.type === 'reservation_start')    byVenue[e.venue_id].res_start++;
+      if (e.type === 'reservation_complete') byVenue[e.venue_id].res++;
+      if (e.type === 'favorite_add')         byVenue[e.venue_id].fav++;
+      if (e.type === 'instagram_click')      byVenue[e.venue_id].insta++;
+      if (e.type === 'phone_click')          byVenue[e.venue_id].phone++;
+    }
+    if (e.region) {
+      byRegion[e.region] = (byRegion[e.region] || 0) + 1;
+    }
+    if (e.categories) {
+      e.categories.forEach(c => { byCat[c] = (byCat[c] || 0) + 1; });
+    }
+    if (typeof e.hour === 'number') {
+      byHour[e.hour]++;
+    }
+    if (e.type === 'search' && e.query) {
+      searchMap[e.query] = (searchMap[e.query] || 0) + 1;
+    }
+  });
+
+  const views   = byType['venue_view'] || 0;
+  const resCom  = byType['reservation_complete'] || 0;
+  const resStart= byType['reservation_start'] || 0;
+  const searches= byType['search'] || 0;
+  const favs    = byType['favorite_add'] || 0;
+  const conv    = views > 0 ? ((resCom / views) * 100).toFixed(1) : '0.0';
+
+  // 핵심 지표
+  document.getElementById('an-views').textContent  = views.toLocaleString();
+  document.getElementById('an-res').textContent    = resCom.toLocaleString();
+  document.getElementById('an-conv').textContent   = conv + '%';
+  document.getElementById('an-search').textContent = searches.toLocaleString();
+  document.getElementById('an-fav').textContent    = favs.toLocaleString();
+
+  // ── 인기 업장 TOP 10 ──────────────────────────────────────────
+  const venueRankData = Object.entries(byVenue)
+    .map(([id, d]) => ({ id, name: allVenueMap[id]?.name ?? id, ...d }))
+    .sort((a, b) => b.views - a.views)
+    .slice(0, 10);
+
+  const maxVV = venueRankData[0]?.views || 1;
+  document.getElementById('an-venue-rank').innerHTML = venueRankData.length === 0
+    ? '<div class="empty" style="padding:20px">데이터 없음</div>'
+    : venueRankData.map((v, i) => `
+      <div class="rank-row">
+        <div class="rank-num ${i < 3 ? 'top3' : ''}">${i + 1}</div>
+        <div class="rank-name">${v.name}</div>
+        <div style="flex:1;margin:0 10px">
+          <div class="bar-track"><div class="bar-fill" style="width:${(v.views/maxVV*100).toFixed(0)}%"></div></div>
+        </div>
+        <div class="rank-val">${v.views}회</div>
+      </div>`).join('');
+
+  // ── 지역별 조회 ──────────────────────────────────────────────
+  const regionData = Object.entries(byRegion).sort((a,b) => b[1]-a[1]);
+  const maxRV = regionData[0]?.[1] || 1;
+  document.getElementById('an-region-chart').innerHTML = regionData.length === 0
+    ? '<div class="empty" style="padding:20px">데이터 없음</div>'
+    : regionData.map(([r, n]) => `
+      <div class="bar-row">
+        <div class="bar-label">${REGION_LABEL[r]||r}</div>
+        <div class="bar-track"><div class="bar-fill bar-fill-green" style="width:${(n/maxRV*100).toFixed(0)}%"></div></div>
+        <div class="bar-val">${n}</div>
+      </div>`).join('');
+
+  // ── 카테고리 인기도 ──────────────────────────────────────────
+  const catData = Object.entries(byCat).sort((a,b) => b[1]-a[1]);
+  const maxCV = catData[0]?.[1] || 1;
+  document.getElementById('an-cat-chart').innerHTML = catData.length === 0
+    ? '<div class="empty" style="padding:20px">데이터 없음</div>'
+    : catData.map(([c, n]) => `
+      <div class="bar-row">
+        <div class="bar-label">${CAT_LABEL[c]||c}</div>
+        <div class="bar-track"><div class="bar-fill bar-fill-gold" style="width:${(n/maxCV*100).toFixed(0)}%"></div></div>
+        <div class="bar-val">${n}</div>
+      </div>`).join('');
+
+  // ── 시간대별 (0~23시) ────────────────────────────────────────
+  const maxHV = Math.max(...byHour, 1);
+  document.getElementById('an-hour-chart').innerHTML = byHour.map((n, h) => `
+    <div class="bar-row" style="margin-bottom:5px">
+      <div class="bar-label" style="width:30px;font-size:11px">${String(h).padStart(2,'0')}시</div>
+      <div class="bar-track" style="height:14px">
+        <div class="bar-fill bar-fill-orange" style="width:${(n/maxHV*100).toFixed(0)}%"></div>
+      </div>
+      <div class="bar-val" style="width:30px;font-size:11px">${n}</div>
+    </div>`).join('');
+
+  // ── 예약 퍼널 ────────────────────────────────────────────────
+  const viewConvRate  = views > 0 ? (resStart/views*100).toFixed(1) : '0.0';
+  const startConvRate = resStart > 0 ? (resCom/resStart*100).toFixed(1) : '0.0';
+  document.getElementById('an-funnel').innerHTML = `
+    <div class="funnel-row">
+      <div class="funnel-label">업장 조회</div>
+      <div class="funnel-count">${views.toLocaleString()}</div>
+      <div class="funnel-pct"></div>
+    </div>
+    <div class="funnel-arrow">↓ ${viewConvRate}% 예약 화면 진입</div>
+    <div class="funnel-row">
+      <div class="funnel-label">예약 시작</div>
+      <div class="funnel-count">${resStart.toLocaleString()}</div>
+      <div class="funnel-pct" style="color:var(--warning)">${viewConvRate}%</div>
+    </div>
+    <div class="funnel-arrow">↓ ${startConvRate}% 완료</div>
+    <div class="funnel-row">
+      <div class="funnel-label">예약 완료</div>
+      <div class="funnel-count" style="color:var(--success)">${resCom.toLocaleString()}</div>
+      <div class="funnel-pct" style="color:var(--success)">${startConvRate}%</div>
+    </div>
+    <div style="margin-top:14px;padding:10px;background:var(--surface2);border-radius:8px;font-size:12px;color:var(--text-muted)">
+      최종 전환율(조회→완료): <strong style="color:var(--accent)">${conv}%</strong>
+      ${parseFloat(conv) < 3 ? ' — 예약 UX 개선 필요' : parseFloat(conv) > 8 ? ' — 우수한 전환율 👍' : ''}
+    </div>`;
+
+  // ── 인기 검색어 ──────────────────────────────────────────────
+  const searchRank = Object.entries(searchMap)
+    .sort((a,b) => b[1]-a[1]).slice(0, 20);
+  document.getElementById('an-search-rank').innerHTML = searchRank.length === 0
+    ? '<div class="empty" style="padding:20px">검색 데이터 없음</div>'
+    : `<table style="width:100%">
+        <thead><tr><th>#</th><th>검색어</th><th>횟수</th></tr></thead>
+        <tbody>${searchRank.map(([q,n],i) => `
+          <tr>
+            <td style="color:var(--text-muted)">${i+1}</td>
+            <td><strong>${q}</strong></td>
+            <td style="color:var(--accent)">${n}회</td>
+          </tr>`).join('')}
+        </tbody></table>`;
+
+  // ── 업장별 성과 전체 ─────────────────────────────────────────
+  const perfRows = venueList.map(v => {
+    const d = byVenue[v.id] || { views:0, res_start:0, res:0, fav:0, insta:0, phone:0 };
+    const convR = d.views > 0 ? (d.res / d.views * 100).toFixed(1) : '0.0';
+    return { ...v, ...d, convR };
+  }).sort((a,b) => b.views - a.views);
+
+  document.getElementById('an-venue-table').innerHTML = `
+    <table style="width:100%">
+      <thead><tr>
+        <th>업장명</th><th>지역</th><th>조회수</th><th>예약완료</th>
+        <th>전환율</th><th>즐겨찾기</th><th>인스타 클릭</th><th>활성</th>
+      </tr></thead>
+      <tbody>${perfRows.map(v => `
+        <tr>
+          <td><strong>${v.name}</strong></td>
+          <td style="font-size:12px;color:var(--text-muted)">${REGION_LABEL[v.region]||'-'}</td>
+          <td style="color:var(--accent);font-weight:700">${(v.view_count||v.views||0).toLocaleString()}</td>
+          <td style="color:var(--success)">${(v.reservation_count||v.res||0)}</td>
+          <td style="color:${parseFloat(v.convR)>5?'var(--success)':'var(--text-muted)'}">${v.convR}%</td>
+          <td>${(v.favorite_count||v.fav||0)}</td>
+          <td>${v.insta||0}</td>
+          <td>${v.is_active
+            ? '<span class="badge badge-active">활성</span>'
+            : '<span class="badge badge-inactive">비활성</span>'}</td>
+        </tr>`).join('')}
+      </tbody></table>`;
+
+  // ── 수익화 인사이트 ───────────────────────────────────────────
+  const topVenue = venueRankData[0];
+  const topRegion = regionData[0];
+  const topCat = catData[0];
+  const topSearch = searchRank[0];
+  const noDataVenues = venueList.filter(v => !byVenue[v.id] || byVenue[v.id].views === 0);
+
+  document.getElementById('an-monetize').innerHTML = [
+    topVenue ? `<div class="insight-row">
+      <div class="insight-icon">🥇</div>
+      <div class="insight-text">
+        <strong>${topVenue.name}</strong>이(가) 조회수 ${topVenue.views}회로 1위입니다.
+        이 업장에 <strong>프리미엄 상단 노출</strong> 상품을 제안하세요.
+        (예: 월 30만원 → 검색 결과 최상단 고정)
+      </div></div>` : '',
+
+    topRegion ? `<div class="insight-row">
+      <div class="insight-icon">📍</div>
+      <div class="insight-text">
+        <strong>${REGION_LABEL[topRegion[0]]||topRegion[0]} 지역</strong>이 조회 수요 1위입니다.
+        해당 지역 신규 업장 입점 영업 우선 타겟으로 설정하세요.
+        수요 대비 공급이 부족하면 <strong>독점 입점 패키지</strong> 판매 가능합니다.
+      </div></div>` : '',
+
+    topCat ? `<div class="insight-row">
+      <div class="insight-icon">🎵</div>
+      <div class="insight-text">
+        <strong>${CAT_LABEL[topCat[0]]||topCat[0]}</strong> 카테고리가 가장 인기 있습니다.
+        해당 장르 이벤트 <strong>배너 광고</strong>나 <strong>이벤트 프로모션 패키지</strong>로
+        수익화하세요. (예: 이벤트 1회 노출 5만원)
+      </div></div>` : '',
+
+    topSearch ? `<div class="insight-row">
+      <div class="insight-icon">🔍</div>
+      <div class="insight-text">
+        인기 검색어 1위: <strong>"${topSearch[0]}"</strong> (${topSearch[1]}회).
+        검색해도 결과 없는 키워드가 있다면 <strong>해당 업장 입점 유치 기회</strong>입니다.
+      </div></div>` : '',
+
+    parseFloat(conv) < 3 ? `<div class="insight-row">
+      <div class="insight-icon">⚠️</div>
+      <div class="insight-text">
+        예약 전환율이 <strong>${conv}%</strong>로 낮습니다.
+        업장 소개 강화, 예약 버튼 위치 개선, 또는
+        <strong>무료 첫 예약 인센티브</strong>를 검토하세요.
+      </div></div>` : '',
+
+    noDataVenues.length > 0 ? `<div class="insight-row">
+      <div class="insight-icon">😴</div>
+      <div class="insight-text">
+        조회수 0인 업장 <strong>${noDataVenues.length}곳</strong>이 있습니다.
+        (${noDataVenues.slice(0,3).map(v=>v.name).join(', ')}${noDataVenues.length>3?` 외 ${noDataVenues.length-3}곳`:''})
+        <strong>첫 노출 패키지</strong>나 사진/설명 개선 서비스를 제안하세요.
+      </div></div>` : '',
+
+    `<div class="insight-row">
+      <div class="insight-icon">💳</div>
+      <div class="insight-text">
+        <strong>수익화 로드맵</strong>:
+        ① 프리미엄 노출 (업장별 월정액) →
+        ② 예약 수수료 (확정 건당 %) →
+        ③ 이벤트 홍보비 →
+        ④ 업주 분석 리포트 유료화 →
+        ⑤ 제휴 음료 브랜드 광고
+      </div></div>`,
+  ].filter(Boolean).join('');
+};
 
 // ── 유틸 ──────────────────────────────────────────────────────────
 function statusBadge(s) {

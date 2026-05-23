@@ -16,6 +16,9 @@ import { useAuth } from '../../contexts/AuthContext';
 import { Colors, Spacing, BorderRadius, Typography } from '../../constants/theme';
 import { CATEGORIES, REGIONS } from '../../constants/regions';
 import type { Venue, VenueEvent, RootStackParamList } from '../../types';
+import {
+  trackVenueView, trackFavorite, trackInstagramClick, trackPhoneClick,
+} from '../../lib/analytics';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 type Route = RouteProp<RootStackParamList, 'VenueDetail'>;
@@ -38,7 +41,17 @@ export default function VenueDetailScreen() {
 
   async function fetchVenue() {
     const snap = await getDoc(doc(db, 'venues', venueId));
-    setVenue(snap.exists() ? { id: snap.id, ...snap.data() } as Venue : null);
+    const venueData = snap.exists() ? { id: snap.id, ...snap.data() } as Venue : null;
+    setVenue(venueData);
+
+    // 업장 조회 추적
+    if (venueData) {
+      trackVenueView(venueId, {
+        region:     venueData.region,
+        categories: venueData.categories,
+        userId:     user?.uid,
+      });
+    }
 
     const today = new Date().toISOString().split('T')[0];
     const evtSnap = await getDocs(query(
@@ -67,9 +80,11 @@ export default function VenueDetailScreen() {
     if (isFavorite) {
       await deleteDoc(favRef);
       setIsFavorite(false);
+      trackFavorite(venueId, false, user.uid);
     } else {
       await setDoc(favRef, { user_id: user.uid, venue_id: venueId, created_at: serverTimestamp() });
       setIsFavorite(true);
+      trackFavorite(venueId, true, user.uid);
     }
   }
 
@@ -242,7 +257,10 @@ export default function VenueDetailScreen() {
               {venue.instagram_handle && (
                 <TouchableOpacity
                   style={[styles.linkBtn, styles.linkBtnInsta]}
-                  onPress={() => Linking.openURL(`https://instagram.com/${venue.instagram_handle}`)}
+                  onPress={() => {
+                    trackInstagramClick(venueId);
+                    Linking.openURL(`https://instagram.com/${venue.instagram_handle}`);
+                  }}
                   activeOpacity={0.75}
                 >
                   <Ionicons name="logo-instagram" size={15} color="#E1306C" />
@@ -252,7 +270,10 @@ export default function VenueDetailScreen() {
               {venue.phone && (
                 <TouchableOpacity
                   style={[styles.linkBtn, styles.linkBtnPhone]}
-                  onPress={() => Linking.openURL(`tel:${venue.phone}`)}
+                  onPress={() => {
+                    trackPhoneClick(venueId);
+                    Linking.openURL(`tel:${venue.phone}`);
+                  }}
                   activeOpacity={0.75}
                 >
                   <Ionicons name="call" size={14} color={Colors.success} />

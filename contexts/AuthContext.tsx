@@ -9,6 +9,7 @@ import {
   type FirebaseUser,
 } from '../lib/firebaseAuth';
 import { registerPushToken } from '../lib/notifications';
+import { trackAppOpen } from '../lib/analytics';
 import type { UserProfile, UserRole } from '../types';
 
 interface AuthContextType {
@@ -58,8 +59,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const fbUser = await fbSignIn(email, password);
     setUser(fbUser);
     await fetchProfile(fbUser.uid);
-    // 푸시 토큰 등록 (비차단 — 실패해도 로그인에 영향 없음)
+    // 푸시 토큰 등록 (비차단)
     registerPushToken(fbUser.uid).catch(() => {});
+    // 앱 오픈 추적 (DAU 측정)
+    trackAppOpen(fbUser.uid);
   }
 
   async function register(email: string, password: string, nickname: string, role: UserRole) {

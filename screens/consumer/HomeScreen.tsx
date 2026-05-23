@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   StatusBar, TextInput, RefreshControl, Modal,
@@ -14,6 +14,7 @@ import { Colors, Spacing, BorderRadius, Typography } from '../../constants/theme
 import { REGIONS, CATEGORIES } from '../../constants/regions';
 import VenueCard from '../../components/VenueCard';
 import type { Venue, RootStackParamList } from '../../types';
+import { trackSearch, trackFilterRegion, trackFilterCategory } from '../../lib/analytics';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -29,6 +30,7 @@ export default function HomeScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchFocused, setSearchFocused] = useState(false);
   const [regionModalVisible, setRegionModalVisible] = useState(false);
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => { fetchVenues(); }, []);
 
@@ -71,6 +73,35 @@ export default function HomeScreen() {
     }
     return true;
   });
+
+  // 검색어 변경 시 debounce 추적
+  function handleSearchChange(text: string) {
+    setSearchQuery(text);
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    searchTimerRef.current = setTimeout(() => {
+      if (text.trim().length >= 2) {
+        const cnt = venues.filter(v => {
+          const q = text.toLowerCase();
+          return v.name.toLowerCase().includes(q) ||
+            (v.name_en?.toLowerCase().includes(q)) ||
+            v.address.toLowerCase().includes(q);
+        }).length;
+        trackSearch(text, cnt);
+      }
+    }, 800);
+  }
+
+  function handleRegionSelect(regionId: string | null) {
+    setSelectedRegion(regionId);
+    setRegionModalVisible(false);
+    if (regionId) trackFilterRegion(regionId);
+  }
+
+  function handleCategorySelect(categoryId: string | null) {
+    const next = selectedCategory === categoryId ? null : categoryId;
+    setSelectedCategory(next);
+    if (next) trackFilterCategory(next);
+  }
 
   const selectedRegionLabel = REGIONS.find(r => r.id === selectedRegion)?.label ?? '서울 전체';
 
@@ -128,10 +159,7 @@ export default function HomeScreen() {
                     return (
                       <TouchableOpacity
                         style={styles.regionItem}
-                        onPress={() => {
-                          setSelectedRegion(item.id);
-                          setRegionModalVisible(false);
-                        }}
+                        onPress={() => handleRegionSelect(item.id)}
                         activeOpacity={0.6}
                       >
                         <Text
@@ -168,7 +196,7 @@ export default function HomeScreen() {
             <TextInput
               style={styles.searchInput}
               value={searchQuery}
-              onChangeText={setSearchQuery}
+              onChangeText={handleSearchChange}
               onFocus={() => setSearchFocused(true)}
               onBlur={() => setSearchFocused(false)}
               placeholder="업장명, 지역 검색"
@@ -194,14 +222,14 @@ export default function HomeScreen() {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.chipScroll}
           >
-            <Chip label="전체" active={!selectedCategory} onPress={() => setSelectedCategory(null)} />
+            <Chip label="전체" active={!selectedCategory} onPress={() => handleCategorySelect(null)} />
             {CATEGORIES.map(c => (
               <Chip
                 key={c.id}
                 label={c.label}
                 active={selectedCategory === c.id}
                 color={c.color}
-                onPress={() => setSelectedCategory(selectedCategory === c.id ? null : c.id)}
+                onPress={() => handleCategorySelect(c.id)}
               />
             ))}
           </ScrollView>

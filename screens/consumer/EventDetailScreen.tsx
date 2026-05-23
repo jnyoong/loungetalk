@@ -9,6 +9,7 @@ import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { Colors, Spacing, BorderRadius, Typography } from '../../constants/theme';
 import type { VenueEvent, Venue, RootStackParamList } from '../../types';
+import { trackEventView } from '../../lib/analytics';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 type Route = RouteProp<RootStackParamList, 'EventDetail'>;
@@ -24,6 +25,8 @@ export default function EventDetailScreen() {
       if (!snap.exists()) return;
       const e = { id: snap.id, ...snap.data() } as VenueEvent;
       setEvent(e);
+      // 이벤트 조회 추적
+      trackEventView(route.params.eventId, e.venue_id);
       if (e.venue_id) {
         const vSnap = await getDoc(doc(db, 'venues', e.venue_id));
         if (vSnap.exists()) setVenue({ id: vSnap.id, ...vSnap.data() } as Venue);

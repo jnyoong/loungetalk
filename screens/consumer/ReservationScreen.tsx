@@ -16,6 +16,7 @@ import { REGIONS } from '../../constants/regions';
 import DropdownModal, { type DropdownItem } from '../../components/DropdownModal';
 import type { Venue, RootStackParamList } from '../../types';
 import KeyboardDoneBar, { KEYBOARD_DONE_ID } from '../../components/KeyboardDoneBar';
+import { trackReservation } from '../../lib/analytics';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 type Route = RouteProp<RootStackParamList, 'Reservation'>;
@@ -78,6 +79,9 @@ export default function ReservationScreen() {
   const [sizeModalVisible, setSizeModalVisible] = useState(false);
 
   useEffect(() => {
+    // 예약 화면 진입 추적
+    trackReservation('start', route.params.venueId, user?.uid);
+
     getDoc(doc(db, 'venues', route.params.venueId)).then(snap => {
       if (snap.exists()) setVenue({ id: snap.id, ...snap.data() } as Venue);
     });
@@ -134,6 +138,9 @@ export default function ReservationScreen() {
           }
         }).catch(() => {});
       }
+
+      // 예약 완료 추적
+      trackReservation('complete', route.params.venueId, user?.uid);
 
       Alert.alert(
         '예약 완료',
