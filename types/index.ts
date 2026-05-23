@@ -1,12 +1,15 @@
 import type { RegionId, CategoryId } from '../constants/regions';
 
 export type UserRole = 'consumer' | 'venue_owner';
+export type VenueOwnerStatus = 'pending' | 'approved' | 'rejected';
 
 export interface UserProfile {
   id: string;
   email: string;
   nickname: string;
   role: UserRole;
+  /** venue_owner 전용: 관리자 승인 상태 (consumer는 undefined) */
+  status?: VenueOwnerStatus;
   preferred_regions: RegionId[];
   preferred_categories: CategoryId[];
   created_at: string;

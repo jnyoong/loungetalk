@@ -69,6 +69,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       email,
       nickname,
       role,
+      // 사업주는 관리자 승인 전까지 'pending' 상태
+      ...(role === 'venue_owner' ? { status: 'pending' as const } : {}),
       preferred_regions: [],
       preferred_categories: [],
       created_at: new Date().toISOString(),

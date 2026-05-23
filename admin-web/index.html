@@ -201,6 +201,10 @@
         <button class="nav-item active" onclick="showPage('dashboard')" data-page="dashboard">
           <span class="nav-icon">📊</span> 대시보드
         </button>
+        <button class="nav-item" onclick="showPage('approvals')" data-page="approvals">
+          <span class="nav-icon">✅</span> 사업주 승인
+          <span id="pending-badge" style="display:none;margin-left:auto;background:var(--accent);color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px"></span>
+        </button>
         <button class="nav-item" onclick="showPage('venues')" data-page="venues">
           <span class="nav-icon">🏢</span> 업장 관리
         </button>
@@ -278,6 +282,38 @@
         </div>
       </div>
 
+      <!-- 사업주 승인 -->
+      <div class="page" id="page-approvals">
+        <div class="page-title">사업주 승인</div>
+        <div class="page-sub">업장 등록 신청 심사 — 승인/거절 처리</div>
+
+        <!-- 대기 중 -->
+        <div style="font-size:13px;font-weight:700;color:var(--text-muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:12px">
+          대기 중 <span id="pending-count" style="color:var(--accent)"></span>
+        </div>
+        <div class="card" style="padding:0;overflow:hidden;margin-bottom:28px">
+          <table>
+            <thead>
+              <tr><th>업체명/담당자</th><th>이메일</th><th>가입일</th><th>상태</th><th>처리</th></tr>
+            </thead>
+            <tbody id="pending-tbody"><tr><td colspan="5" class="loading">로딩 중...</td></tr></tbody>
+          </table>
+        </div>
+
+        <!-- 처리 완료 (승인/거절) -->
+        <div style="font-size:13px;font-weight:700;color:var(--text-muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:12px">
+          처리 완료
+        </div>
+        <div class="card" style="padding:0;overflow:hidden">
+          <table>
+            <thead>
+              <tr><th>업체명/담당자</th><th>이메일</th><th>가입일</th><th>상태</th><th>처리</th></tr>
+            </thead>
+            <tbody id="processed-tbody"><tr><td colspan="5" class="loading">로딩 중...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
       <!-- 사용자 -->
       <div class="page" id="page-users">
         <div class="page-title">사용자 관리</div>
@@ -285,9 +321,9 @@
         <div class="card" style="padding:0;overflow:hidden">
           <table>
             <thead>
-              <tr><th>닉네임</th><th>이메일</th><th>역할</th><th>가입일</th></tr>
+              <tr><th>닉네임</th><th>이메일</th><th>역할</th><th>상태</th><th>가입일</th></tr>
             </thead>
-            <tbody id="users-tbody"><tr><td colspan="4" class="loading">로딩 중...</td></tr></tbody>
+            <tbody id="users-tbody"><tr><td colspan="5" class="loading">로딩 중...</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -449,6 +485,7 @@ onAuthStateChanged(auth, user => {
     loadDashboard();
     loadVenues();
     loadUsers();
+    loadApprovals();  // 뱃지 카운트 초기화용
   } else {
     document.getElementById('login-screen').style.display = 'flex';
     document.getElementById('app').style.display = 'none';
@@ -478,6 +515,7 @@ window.showPage = (name) => {
   document.getElementById('page-' + name).classList.add('active');
   document.querySelector(`[data-page="${name}"]`).classList.add('active');
   if (name === 'reservations') loadReservations();
+  if (name === 'approvals') loadApprovals();
 };
 
 // ── 대시보드 ──────────────────────────────────────────────────────
@@ -700,18 +738,105 @@ window.loadReservations = async () => {
   `).join('');
 };
 
+// ── 사업주 승인 관리 ─────────────────────────────────────────────
+async function loadApprovals() {
+  const snap = await getDocs(query(collection(db, 'profiles'), where('role', '==', 'venue_owner')));
+  const all = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+    .sort((a, b) => (b.created_at?.seconds ?? 0) - (a.created_at?.seconds ?? 0));
+
+  const pending   = all.filter(u => !u.status || u.status === 'pending');
+  const processed = all.filter(u => u.status === 'approved' || u.status === 'rejected');
+
+  // 사이드바 뱃지
+  const badge = document.getElementById('pending-badge');
+  const countEl = document.getElementById('pending-count');
+  if (pending.length > 0) {
+    badge.style.display = 'inline-block';
+    badge.textContent = pending.length;
+    if (countEl) countEl.textContent = `(${pending.length}건)`;
+  } else {
+    badge.style.display = 'none';
+    if (countEl) countEl.textContent = '';
+  }
+
+  // 대기 중 테이블
+  const pendingTbody = document.getElementById('pending-tbody');
+  if (!pendingTbody) return;
+  if (!pending.length) {
+    pendingTbody.innerHTML = '<tr><td colspan="5" class="empty">대기 중인 신청 없음</td></tr>';
+  } else {
+    pendingTbody.innerHTML = pending.map(u => `
+      <tr>
+        <td><strong>${u.nickname}</strong></td>
+        <td style="color:var(--text-muted)">${u.email}</td>
+        <td style="font-size:12px;color:var(--text-muted)">${u.created_at?.seconds ? new Date(u.created_at.seconds*1000).toLocaleDateString('ko') : '-'}</td>
+        <td><span class="badge badge-pending">대기중</span></td>
+        <td>
+          <button class="btn btn-sm btn-success" onclick="approveOwner('${u.id}')">✓ 승인</button>
+          <button class="btn btn-sm btn-danger" style="margin-left:4px" onclick="rejectOwner('${u.id}')">✕ 거절</button>
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  // 처리 완료 테이블
+  const processedTbody = document.getElementById('processed-tbody');
+  if (!processed.length) {
+    processedTbody.innerHTML = '<tr><td colspan="5" class="empty">처리된 내역 없음</td></tr>';
+  } else {
+    processedTbody.innerHTML = processed.map(u => `
+      <tr>
+        <td><strong>${u.nickname}</strong></td>
+        <td style="color:var(--text-muted)">${u.email}</td>
+        <td style="font-size:12px;color:var(--text-muted)">${u.created_at?.seconds ? new Date(u.created_at.seconds*1000).toLocaleDateString('ko') : '-'}</td>
+        <td>${u.status === 'approved'
+          ? '<span class="badge badge-confirmed">승인됨</span>'
+          : '<span class="badge badge-cancelled">거절됨</span>'}</td>
+        <td>
+          ${u.status === 'rejected'
+            ? `<button class="btn btn-sm btn-success" onclick="approveOwner('${u.id}')">✓ 승인</button>`
+            : `<button class="btn btn-sm btn-danger" onclick="rejectOwner('${u.id}')">취소</button>`}
+        </td>
+      </tr>
+    `).join('');
+  }
+}
+
+window.approveOwner = async (uid) => {
+  if (!confirm('이 사업주를 승인하시겠어요?')) return;
+  try {
+    await updateDoc(doc(db, 'profiles', uid), { status: 'approved', approved_at: serverTimestamp() });
+    alert('승인 완료! 사업주가 앱에 접근할 수 있습니다.');
+    loadApprovals();
+  } catch (e) { alert('오류: ' + e.message); }
+};
+
+window.rejectOwner = async (uid) => {
+  if (!confirm('이 사업주 신청을 거절하시겠어요?')) return;
+  try {
+    await updateDoc(doc(db, 'profiles', uid), { status: 'rejected', rejected_at: serverTimestamp() });
+    alert('거절 처리되었습니다.');
+    loadApprovals();
+  } catch (e) { alert('오류: ' + e.message); }
+};
+
 // ── 사용자 목록 ───────────────────────────────────────────────────
 async function loadUsers() {
   const snap = await getDocs(collection(db, 'profiles'));
   const list = snap.docs.map(d => ({ id: d.id, ...d.data() }))
     .sort((a, b) => (b.created_at?.seconds ?? 0) - (a.created_at?.seconds ?? 0));
   const tbody = document.getElementById('users-tbody');
-  if (!list.length) { tbody.innerHTML = '<tr><td colspan="4" class="empty">사용자 없음</td></tr>'; return; }
+  if (!list.length) { tbody.innerHTML = '<tr><td colspan="5" class="empty">사용자 없음</td></tr>'; return; }
   tbody.innerHTML = list.map(u => `
     <tr>
       <td><strong>${u.nickname}</strong></td>
       <td style="color:var(--text-muted)">${u.email}</td>
       <td>${u.role === 'venue_owner' ? '<span class="badge badge-confirmed">사업주</span>' : '<span class="badge badge-inactive">소비자</span>'}</td>
+      <td>${u.role === 'venue_owner' ? (
+        u.status === 'approved' ? '<span class="badge badge-confirmed">승인</span>' :
+        u.status === 'rejected' ? '<span class="badge badge-cancelled">거절</span>' :
+        '<span class="badge badge-pending">대기</span>'
+      ) : '-'}</td>
       <td style="font-size:12px;color:var(--text-muted)">${u.created_at?.seconds ? new Date(u.created_at.seconds*1000).toLocaleDateString('ko') : '-'}</td>
     </tr>
   `).join('');

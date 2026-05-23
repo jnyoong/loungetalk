@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, TextInput, TouchableOpacity,
   SafeAreaView, StatusBar, KeyboardAvoidingView, Platform,
@@ -9,6 +9,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAuth } from '../../contexts/AuthContext';
 import { Colors, Spacing, BorderRadius, Typography } from '../../constants/theme';
 import type { AuthStackParamList } from '../../types';
+import KeyboardDoneBar, { KEYBOARD_DONE_ID } from '../../components/KeyboardDoneBar';
 
 type Nav = NativeStackNavigationProp<AuthStackParamList>;
 
@@ -18,6 +19,7 @@ export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const passwordRef = useRef<TextInput>(null);
 
   async function handleLogin() {
     if (!email.trim() || !password) {
@@ -41,6 +43,7 @@ export default function LoginScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" />
+      <KeyboardDoneBar />
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView style={styles.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
 
@@ -65,6 +68,9 @@ export default function LoginScreen() {
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoCorrect={false}
+                returnKeyType="next"
+                onSubmitEditing={() => passwordRef.current?.focus()}
+                inputAccessoryViewID={KEYBOARD_DONE_ID}
                 editable={!loading}
               />
             </View>
@@ -72,12 +78,16 @@ export default function LoginScreen() {
             <View style={styles.inputGroup}>
               <Text style={styles.label}>비밀번호</Text>
               <TextInput
+                ref={passwordRef}
                 style={styles.input}
                 value={password}
                 onChangeText={setPassword}
                 placeholder="비밀번호 입력"
                 placeholderTextColor={Colors.textMuted}
                 secureTextEntry
+                returnKeyType="done"
+                onSubmitEditing={handleLogin}
+                inputAccessoryViewID={KEYBOARD_DONE_ID}
                 editable={!loading}
               />
             </View>

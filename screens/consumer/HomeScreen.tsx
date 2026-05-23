@@ -100,6 +100,7 @@ export default function HomeScreen() {
             style={styles.regionChevron}
           />
         </TouchableOpacity>
+        <Text style={styles.headerWordmark} allowFontScaling={false}>LOUNGETALK</Text>
       </View>
 
       {/* ── 지역 선택 모달 ────────────────────────────────────── */}
@@ -285,6 +286,9 @@ const styles = StyleSheet.create({
 
   // ── 헤더
   header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: Spacing.lg,
     paddingTop: Spacing.sm,
     paddingBottom: Spacing.md,
@@ -294,7 +298,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    alignSelf: 'flex-start',
   },
   regionBtnText: {
     fontSize: Platform.OS === 'android' ? 22 : 24,
@@ -304,6 +307,12 @@ const styles = StyleSheet.create({
   },
   regionChevron: {
     marginTop: Platform.OS === 'android' ? 2 : 3,
+  },
+  headerWordmark: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: Colors.textMuted,
+    letterSpacing: 3,
   },
 
   // ── 지역 모달

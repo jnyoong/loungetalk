@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   SafeAreaView, TextInput, Alert, KeyboardAvoidingView,
@@ -15,6 +15,7 @@ import { Colors, Spacing, BorderRadius } from '../../constants/theme';
 import { REGIONS } from '../../constants/regions';
 import DropdownModal, { type DropdownItem } from '../../components/DropdownModal';
 import type { Venue, RootStackParamList } from '../../types';
+import KeyboardDoneBar, { KEYBOARD_DONE_ID } from '../../components/KeyboardDoneBar';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 type Route = RouteProp<RootStackParamList, 'Reservation'>;
@@ -155,6 +156,7 @@ export default function ReservationScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={Colors.bg} />
+      <KeyboardDoneBar />
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView
           style={styles.scroll}
@@ -244,6 +246,8 @@ export default function ReservationScreen() {
                   onChangeText={setName}
                   placeholder="홍길동"
                   placeholderTextColor={Colors.textMuted}
+                  returnKeyType="next"
+                  inputAccessoryViewID={KEYBOARD_DONE_ID}
                   allowFontScaling={false}
                 />
               </View>
@@ -262,6 +266,8 @@ export default function ReservationScreen() {
                   placeholderTextColor={Colors.textMuted}
                   keyboardType="phone-pad"
                   maxLength={13}
+                  returnKeyType="done"
+                  inputAccessoryViewID={KEYBOARD_DONE_ID}
                   allowFontScaling={false}
                 />
                 {phoneError ? (

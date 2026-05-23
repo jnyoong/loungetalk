@@ -12,6 +12,7 @@ import EventDetailScreen from '../screens/consumer/EventDetailScreen';
 import ReservationScreen from '../screens/consumer/ReservationScreen';
 import MyReservationsScreen from '../screens/consumer/MyReservationsScreen';
 import VenueReservationsScreen from '../screens/venue/VenueReservationsScreen';
+import VenuePendingScreen from '../screens/venue/VenuePendingScreen';
 import type { RootStackParamList } from '../types';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -27,11 +28,19 @@ export default function RootNavigator() {
     );
   }
 
+  // 사업주이지만 아직 승인 전
+  const isVenueOwnerPending =
+    profile?.role === 'venue_owner' &&
+    profile?.status !== 'approved';
+
   return (
     <NavigationContainer>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {!user ? (
           <Stack.Screen name="Auth" component={AuthNavigator} />
+        ) : isVenueOwnerPending ? (
+          // 승인 대기 화면 (스택 없이 단독 화면)
+          <Stack.Screen name="Auth" component={VenuePendingScreen} />
         ) : profile?.role === 'venue_owner' ? (
           <>
             <Stack.Screen name="Main" component={VenueTabNavigator} />

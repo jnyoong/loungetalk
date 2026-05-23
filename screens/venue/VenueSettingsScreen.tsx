@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   SafeAreaView, StatusBar, Alert, TextInput, Linking,
-  ActivityIndicator, Platform,
+  ActivityIndicator, Platform, Modal,
 } from 'react-native';
+import { WebView } from 'react-native-webview';
 import { Ionicons } from '@expo/vector-icons';
 import {
   collection, query, where, getDocs,
@@ -12,6 +13,7 @@ import {
 import { db } from '../../lib/firebase';
 import { useAuth } from '../../contexts/AuthContext';
 import { Colors, Spacing, BorderRadius, Typography } from '../../constants/theme';
+import KeyboardDoneBar, { KEYBOARD_DONE_ID } from '../../components/KeyboardDoneBar';
 
 // ── Instagram URL 유틸 ─────────────────────────────────────────────────────
 function extractInstagramShortcode(url: string): string | null {
@@ -40,8 +42,7 @@ export default function VenueSettingsScreen() {
   const [venueId, setVenueId] = useState<string | null>(null);
   const [instaHandle, setInstaHandle] = useState('');
   const [instaPostUrl, setInstaPostUrl] = useState('');
-  const [oEmbedResult, setOEmbedResult] = useState<any>(null);
-  const [loadingOEmbed, setLoadingOEmbed] = useState(false);
+  const [previewModalVisible, setPreviewModalVisible] = useState(false);
   const [saving, setSaving] = useState(false);
   const [loadingVenue, setLoadingVenue] = useState(true);
 
@@ -91,21 +92,18 @@ export default function VenueSettingsScreen() {
     setSaving(false);
   }
 
-  // ── oEmbed 미리보기 ───────────────────────────────────────────────────────
-  async function handlePreviewOEmbed() {
+  // ── 게시물 미리보기 (WebView 모달) ───────────────────────────────────────
+  function handlePreviewOEmbed() {
     if (!instaPostUrl.trim()) {
       Alert.alert('URL 입력', '인스타그램 게시물 URL을 먼저 입력해주세요.');
       return;
     }
-    const shortcode = extractInstagramShortcode(instaPostUrl);
-    if (!shortcode) {
+    const sc = extractInstagramShortcode(instaPostUrl);
+    if (!sc) {
       Alert.alert('잘못된 URL', 'instagram.com/p/... 또는 /reel/... 형식이어야 합니다.');
       return;
     }
-    setLoadingOEmbed(true);
-    const result = await fetchOEmbed(instaPostUrl);
-    setOEmbedResult(result);
-    setLoadingOEmbed(false);
+    setPreviewModalVisible(true);
   }
 
   // ── 인스타 앱 또는 웹 열기 ────────────────────────────────────────────────
@@ -120,9 +118,65 @@ export default function VenueSettingsScreen() {
 
   const shortcode = extractInstagramShortcode(instaPostUrl);
 
+  const previewShortcode = extractInstagramShortcode(instaPostUrl);
+  const embedUrl = previewShortcode
+    ? `https://www.instagram.com/p/${previewShortcode}/embed/`
+    : '';
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={Colors.bg} />
+      <KeyboardDoneBar />
+
+      {/* ── 인스타그램 게시물 미리보기 모달 ─────────────────────── */}
+      <Modal
+        visible={previewModalVisible}
+        transparent
+        animationType="slide"
+        statusBarTranslucent
+      >
+        <View style={styles.previewOverlay}>
+          <View style={styles.previewSheet}>
+            {/* 헤더 */}
+            <View style={styles.previewHeader}>
+              <Text style={styles.previewTitle} allowFontScaling={false}>게시물 미리보기</Text>
+              <TouchableOpacity
+                onPress={() => setPreviewModalVisible(false)}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+              >
+                <Ionicons name="close" size={22} color={Colors.textPrimary} />
+              </TouchableOpacity>
+            </View>
+            {/* WebView */}
+            <WebView
+              source={{ uri: embedUrl }}
+              style={styles.previewWebView}
+              javaScriptEnabled
+              domStorageEnabled
+              startInLoadingState
+              renderLoading={() => (
+                <View style={styles.webViewLoading}>
+                  <ActivityIndicator size="large" color={Colors.accent} />
+                </View>
+              )}
+            />
+            {/* 인스타에서 열기 */}
+            <TouchableOpacity
+              style={styles.previewOpenBtn}
+              onPress={() => {
+                setPreviewModalVisible(false);
+                openInInstagram();
+              }}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="logo-instagram" size={16} color={Colors.textPrimary} />
+              <Text style={styles.previewOpenText} allowFontScaling={false}>Instagram에서 전체 보기</Text>
+              <Ionicons name="open-outline" size={14} color={Colors.textMuted} />
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
       <ScrollView showsVerticalScrollIndicator={false}>
 
         {/* ── 프로필 헤더 ──────────────────────────────────────── */}
@@ -171,6 +225,9 @@ export default function VenueSettingsScreen() {
                     placeholderTextColor={Colors.textMuted}
                     autoCapitalize="none"
                     autoCorrect={false}
+                    returnKeyType="done"
+                    blurOnSubmit
+                    inputAccessoryViewID={KEYBOARD_DONE_ID}
                     allowFontScaling={false}
                   />
                 </View>
@@ -187,30 +244,30 @@ export default function VenueSettingsScreen() {
                 <TextInput
                   style={styles.instaInput}
                   value={instaPostUrl}
-                  onChangeText={v => { setInstaPostUrl(v); setOEmbedResult(null); }}
+                  onChangeText={v => { setInstaPostUrl(v); }}
                   placeholder="https://www.instagram.com/p/..."
                   placeholderTextColor={Colors.textMuted}
                   autoCapitalize="none"
                   autoCorrect={false}
                   keyboardType="url"
+                  returnKeyType="done"
+                  blurOnSubmit
+                  inputAccessoryViewID={KEYBOARD_DONE_ID}
                   allowFontScaling={false}
                 />
                 <Text style={styles.instaHint} allowFontScaling={false}>
                   인스타그램 앱에서 게시물 → 공유 → 링크 복사
                 </Text>
 
-                {/* 미리보기 버튼 */}
+                {/* 미리보기 / 열기 버튼 */}
                 <View style={styles.instaActions}>
                   <TouchableOpacity
                     style={styles.previewBtn}
                     onPress={handlePreviewOEmbed}
-                    disabled={loadingOEmbed}
                     activeOpacity={0.7}
                   >
-                    {loadingOEmbed
-                      ? <ActivityIndicator size="small" color={Colors.accent} />
-                      : <Text style={styles.previewBtnText} allowFontScaling={false}>미리보기</Text>
-                    }
+                    <Ionicons name="eye-outline" size={14} color={Colors.accent} />
+                    <Text style={styles.previewBtnText} allowFontScaling={false}>미리보기</Text>
                   </TouchableOpacity>
                   {shortcode && (
                     <TouchableOpacity
@@ -218,29 +275,21 @@ export default function VenueSettingsScreen() {
                       onPress={openInInstagram}
                       activeOpacity={0.7}
                     >
-                      <Text style={styles.openBtnText} allowFontScaling={false}>인스타에서 열기</Text>
+                      <Text style={styles.openBtnText} allowFontScaling={false}>앱에서 열기</Text>
                       <Ionicons name="open-outline" size={13} color={Colors.textMuted} />
                     </TouchableOpacity>
                   )}
                 </View>
 
-                {/* oEmbed 결과 */}
-                {oEmbedResult ? (
-                  <View style={styles.resultBox}>
-                    <Ionicons name="checkmark-circle" size={14} color={Colors.success} />
-                    <Text style={styles.resultText} allowFontScaling={false}>
-                      {oEmbedResult.author_name ?? '연동 성공'}
-                    </Text>
-                  </View>
-                ) : instaPostUrl.trim() && shortcode && !loadingOEmbed ? (
+                {/* 안내 박스 */}
+                {instaPostUrl.trim() && shortcode && (
                   <View style={styles.fallbackBox}>
-                    <Ionicons name="information-circle-outline" size={14} color={Colors.warning} />
+                    <Ionicons name="information-circle-outline" size={14} color={Colors.accent} />
                     <Text style={styles.fallbackText} allowFontScaling={false}>
-                      Meta 앱 토큰 없이도 URL은 저장됩니다.{'\n'}
-                      소비자 화면에서 "인스타 보기 ↗" 링크로 표시돼요.
+                      저장 후 업장 상세 화면에서 "인스타그램 보기" 링크로 표시됩니다.
                     </Text>
                   </View>
-                ) : null}
+                )}
               </View>
 
               {/* 저장 버튼 */}
@@ -435,19 +484,75 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   previewBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
     backgroundColor: Colors.accentSoft,
     borderRadius: BorderRadius.sm,
     paddingHorizontal: Spacing.md,
     paddingVertical: 9,
     borderWidth: 1,
     borderColor: Colors.accentMid,
-    minWidth: 72,
-    alignItems: 'center',
+    minWidth: 80,
   },
   previewBtnText: {
     fontSize: 13,
     fontWeight: '600',
     color: Colors.accent,
+  },
+
+  // 미리보기 모달
+  previewOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'flex-end',
+  },
+  previewSheet: {
+    backgroundColor: '#111111',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    height: '80%',
+    overflow: 'hidden',
+  },
+  previewHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.md,
+    paddingBottom: Spacing.sm,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: Colors.border,
+  },
+  previewTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: Colors.textPrimary,
+  },
+  previewWebView: {
+    flex: 1,
+    backgroundColor: '#000',
+  },
+  webViewLoading: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0, bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#111111',
+  },
+  previewOpenBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.sm,
+    paddingVertical: Spacing.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: Colors.border,
+  },
+  previewOpenText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: Colors.textPrimary,
   },
   openBtn: {
     flexDirection: 'row',

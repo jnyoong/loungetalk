@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, TextInput, TouchableOpacity,
   SafeAreaView, StatusBar, KeyboardAvoidingView, Platform,
@@ -9,6 +9,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAuth } from '../../contexts/AuthContext';
 import { Colors, Spacing, BorderRadius, Typography } from '../../constants/theme';
 import type { AuthStackParamList } from '../../types';
+import KeyboardDoneBar, { KEYBOARD_DONE_ID } from '../../components/KeyboardDoneBar';
 
 type Nav = NativeStackNavigationProp<AuthStackParamList>;
 type Route = RouteProp<AuthStackParamList, 'Signup'>;
@@ -26,6 +27,8 @@ export default function SignupScreen() {
   const [loading, setLoading] = useState(false);
   const [agreed, setAgreed] = useState(false);
   const [ageConfirmed, setAgeConfirmed] = useState(false);
+  const emailRef = useRef<TextInput>(null);
+  const passwordRef = useRef<TextInput>(null);
 
   async function handleSignup() {
     if (!nickname.trim()) { Alert.alert('입력 확인', isVenueOwner ? '업체명을 입력해주세요.' : '닉네임을 입력해주세요.'); return; }
@@ -38,6 +41,13 @@ export default function SignupScreen() {
     setLoading(true);
     try {
       await register(email.trim(), password, nickname.trim(), role);
+      // 사업주인 경우 승인 대기 안내 (RootNavigator가 자동으로 VenuePendingScreen으로 전환)
+      if (isVenueOwner) {
+        Alert.alert(
+          '가입 신청 완료 🎉',
+          '관리자 승인 후 서비스를 이용할 수 있습니다.\n보통 1~2 영업일이 소요됩니다.'
+        );
+      }
     } catch (e: any) {
       const msg = e.message ?? '';
       if (msg.includes('EMAIL_EXISTS') || msg.includes('email-already-in-use')) {
@@ -54,6 +64,7 @@ export default function SignupScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" />
+      <KeyboardDoneBar />
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView style={styles.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
 
@@ -83,6 +94,9 @@ export default function SignupScreen() {
                 placeholder={isVenueOwner ? '라운지ABC / 홍길동' : '닉네임'}
                 placeholderTextColor={Colors.textMuted}
                 maxLength={20}
+                returnKeyType="next"
+                onSubmitEditing={() => emailRef.current?.focus()}
+                inputAccessoryViewID={KEYBOARD_DONE_ID}
                 editable={!loading}
               />
             </View>
@@ -90,6 +104,7 @@ export default function SignupScreen() {
             <View style={styles.inputGroup}>
               <Text style={styles.label}>이메일</Text>
               <TextInput
+                ref={emailRef}
                 style={styles.input}
                 value={email}
                 onChangeText={setEmail}
@@ -98,6 +113,9 @@ export default function SignupScreen() {
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoCorrect={false}
+                returnKeyType="next"
+                onSubmitEditing={() => passwordRef.current?.focus()}
+                inputAccessoryViewID={KEYBOARD_DONE_ID}
                 editable={!loading}
               />
             </View>
@@ -105,12 +123,16 @@ export default function SignupScreen() {
             <View style={styles.inputGroup}>
               <Text style={styles.label}>비밀번호</Text>
               <TextInput
+                ref={passwordRef}
                 style={styles.input}
                 value={password}
                 onChangeText={setPassword}
                 placeholder="6자 이상"
                 placeholderTextColor={Colors.textMuted}
                 secureTextEntry
+                returnKeyType="done"
+                onSubmitEditing={handleSignup}
+                inputAccessoryViewID={KEYBOARD_DONE_ID}
                 editable={!loading}
               />
             </View>
