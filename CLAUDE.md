@@ -254,9 +254,65 @@ npm start
 
 ---
 
-## 배포 프로세스 (clipu와 동일)
+## 배포 프로세스
 
-### Android 빌드 (Windows)
+### iOS 빌드 (맥북 Xcode)
+
+**매 배포 시 (맥북 터미널):**
+```bash
+cd /Users/jun/loungetalk
+git pull
+open ios/loungetalk.xcworkspace
+```
+→ Xcode: **Product → Archive → Distribute App → App Store Connect → Upload**
+
+> ⚠️ `.env` 파일은 맥북에 이미 영구 존재 (gitignore라 git에는 없지만 한 번 만들면 삭제 전까지 유지)  
+> ⚠️ `ios/` 폴더가 git에 포함되어 있으므로 git pull 하면 buildNumber 포함 모든 변경 자동 반영
+
+**buildNumber 업 시 (Claude가 자동으로):**
+- `app.json` ios.buildNumber 증가
+- `ios/app/Info.plist` CFBundleVersion 동일 숫자로 업데이트
+- git push → 맥북에서 git pull만 하면 됨
+
+**재실행 필요한 경우 (플러그인 추가·변경 시만):**
+```bash
+npx expo prebuild --platform ios --clean
+cd ios && pod install && cd ..
+# → 프로비저닝 프로파일 다시 설정 후 Archive
+```
+
+**최초 맥북 세팅 시 (새 맥북이거나 loungetalk 폴더 없을 때):**
+```bash
+git clone https://github.com/jnyoong/loungetalk.git
+cd /Users/jun/loungetalk  # 또는 클론한 경로
+npm install
+
+# .env 생성 (한 번만, 이후 영구 유지)
+cat > .env << 'EOF'
+EXPO_PUBLIC_FIREBASE_API_KEY=AIzaSyDVEgs7lrzGLJBCUODOuX0JmxIa4TCYpEg
+EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN=lounge-35d0a.firebaseapp.com
+EXPO_PUBLIC_FIREBASE_PROJECT_ID=lounge-35d0a
+EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET=lounge-35d0a.firebasestorage.app
+EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=885778472477
+EXPO_PUBLIC_FIREBASE_APP_ID=1:885778472477:web:cb49b28058adb8d141b0f4
+EOF
+
+# ios/ 폴더가 git에 포함되어 있으므로 prebuild 불필요
+# pod install만 실행
+cd ios && pod install && cd ..
+open ios/loungetalk.xcworkspace
+```
+→ Xcode에서 프로비저닝 프로파일 설정 후 Archive
+
+**맥북 Xcode 혼동 방지:**
+- 워크스페이스: `loungetalk.xcworkspace` (clipu 아님)
+- 타겟 이름: `app` (Expo prebuild 기본값, 라운지톡 맞음)
+- Team: `Y9Q88U5QG3`
+- 프로비저닝 프로파일: `loungetalk AppStore`
+
+---
+
+### Android 빌드 (Windows) — 추후
 ```bash
 # 1) android/app/build.gradle versionCode 1 증가
 # 2) 빌드 실행
@@ -266,16 +322,10 @@ cd android && ./gradlew bundleRelease -x lint
 ```
 - AAB 위치: `android/app/build/outputs/bundle/release/app-release.aab`
 
-### iOS 빌드 (맥북 Xcode)
-```bash
-npx expo prebuild --platform ios --clean  # 플러그인 변경 시
-cd ios && pod install && cd ..
-```
-→ Xcode: `open ios/loungetalk.xcworkspace` → Archive → Distribute
-
 ### 버전 업 체크리스트
 - [ ] `app.json` ios.buildNumber 증가
-- [ ] `android/app/build.gradle` versionCode 증가
+- [ ] `ios/app/Info.plist` CFBundleVersion 동일 숫자로 증가
+- [ ] (Android 배포 시) `android/app/build.gradle` versionCode 증가
 
 ---
 
@@ -299,6 +349,13 @@ cd ios && pod install && cd ..
 - 다크모드 UI (#0A0A0A 배경, #C9A84C 골드 포인트)
 - 외국인 대응 영문 필드
 - Git 초기화 (로컬)
+
+### v1.0.0 iOS 출시 — 2026-05-24
+- App Store Connect 등록 (번들ID: com.loungetalk.app, 카테고리: 음식 및 음료, 연령: 17+)
+- buildNumber 4로 TestFlight 업로드 완료
+- 프로비저닝 프로파일: `loungetalk AppStore`
+- .env는 맥북 `/Users/jun/loungetalk/.env` 에 영구 보관 (gitignore)
+- ios/ 폴더 git 포함 → 다음 배포부터 맥북에서 `git pull → Archive`만 하면 됨
 
 ### v1.1.0 — 2026-05-24 (UX + 사업주 승인 + 분석 시스템)
 
