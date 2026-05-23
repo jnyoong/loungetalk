@@ -14,9 +14,11 @@ import { sendPushNotification, getProfilePushToken } from '../../lib/notificatio
 import { Colors, Spacing, BorderRadius } from '../../constants/theme';
 import { REGIONS } from '../../constants/regions';
 import DropdownModal, { type DropdownItem } from '../../components/DropdownModal';
+import VisitTimePickerModal from '../../components/VisitTimePickerModal';
 import type { Venue, RootStackParamList } from '../../types';
 import KeyboardDoneBar, { KEYBOARD_DONE_ID } from '../../components/KeyboardDoneBar';
 import { trackReservation } from '../../lib/analytics';
+import { formatVisitDateTime } from '../../lib/nightlifeDate';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 type Route = RouteProp<RootStackParamList, 'Reservation'>;
@@ -74,9 +76,11 @@ export default function ReservationScreen() {
   const [phone, setPhone] = useState('');
   const [phoneError, setPhoneError] = useState('');
   const [requests, setRequests] = useState('');
+  const [visitTime, setVisitTime] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [dateModalVisible, setDateModalVisible] = useState(false);
   const [sizeModalVisible, setSizeModalVisible] = useState(false);
+  const [timeModalVisible, setTimeModalVisible] = useState(false);
 
   useEffect(() => {
     // 예약 화면 진입 추적
@@ -117,6 +121,7 @@ export default function ReservationScreen() {
         venue_id: route.params.venueId,
         user_id: user.uid,
         reservation_date: date,
+        visit_time: visitTime || null,
         party_size: parseInt(partySize),
         contact_name: name,
         contact_phone: phone,
@@ -132,7 +137,7 @@ export default function ReservationScreen() {
             sendPushNotification({
               to: token,
               title: '새 예약 신청이 들어왔습니다 🔔',
-              body: `${name} (${partySize}명) · ${date}`,
+              body: `${name} (${partySize}명) · ${formatVisitDateTime(date, visitTime)}`,
               data: { type: 'new_reservation', venueId: venue.id },
             }).catch(() => {});
           }
@@ -223,6 +228,27 @@ export default function ReservationScreen() {
                 <Text style={styles.fieldLabel} allowFontScaling={false}>방문 날짜</Text>
                 <Text style={styles.fieldValue} allowFontScaling={false}>
                   {selectedDateLabel}
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
+            </TouchableOpacity>
+            <View style={styles.separator} />
+
+            {/* 방문 시각 */}
+            <TouchableOpacity
+              style={styles.fieldRow}
+              onPress={() => setTimeModalVisible(true)}
+              activeOpacity={0.65}
+            >
+              <View style={styles.fieldLeft}>
+                <Text style={styles.fieldLabel} allowFontScaling={false}>방문 시각</Text>
+                <Text
+                  style={[styles.fieldValue, !visitTime && { color: Colors.textMuted }]}
+                  allowFontScaling={false}
+                >
+                  {visitTime
+                    ? (parseInt(visitTime.split(':')[0], 10) < 8 ? `익일 ${visitTime}` : visitTime)
+                    : '시각 선택 (선택사항)'}
                 </Text>
               </View>
               <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
@@ -346,6 +372,14 @@ export default function ReservationScreen() {
         selectedValue={partySize}
         onSelect={v => setPartySize(v)}
         onClose={() => setSizeModalVisible(false)}
+      />
+      <VisitTimePickerModal
+        visible={timeModalVisible}
+        value={visitTime}
+        openTime={venue?.open_time ?? null}
+        closeTime={venue?.close_time ?? null}
+        onConfirm={t => setVisitTime(t)}
+        onClose={() => setTimeModalVisible(false)}
       />
     </SafeAreaView>
   );

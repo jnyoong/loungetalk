@@ -259,11 +259,12 @@
       <div class="page active" id="page-dashboard">
         <div class="page-title">대시보드</div>
         <div class="page-sub">전체 현황을 확인합니다</div>
-        <div class="stats-grid" id="stats-grid">
+        <div class="stats-grid" id="stats-grid" style="grid-template-columns:repeat(5,1fr)">
           <div class="stat-card"><div class="stat-val" id="stat-venues">-</div><div class="stat-label">등록 업장</div></div>
           <div class="stat-card"><div class="stat-val" id="stat-users">-</div><div class="stat-label">가입 사용자</div></div>
           <div class="stat-card"><div class="stat-val" id="stat-reservations">-</div><div class="stat-label">전체 예약</div></div>
           <div class="stat-card"><div class="stat-val" id="stat-pending">-</div><div class="stat-label">대기 중 예약</div></div>
+          <div class="stat-card" style="border-color:rgba(123,97,255,0.35)"><div class="stat-val" id="stat-today-visits" style="color:var(--accent)">-</div><div class="stat-label">오늘 방문 예정 <span style="font-size:10px;display:block;color:var(--text-muted)">영업일 기준</span></div></div>
         </div>
         <div class="card">
           <div style="font-weight:700;margin-bottom:14px">최근 예약 (10건)</div>
@@ -306,7 +307,7 @@
         <div class="card" style="padding:0;overflow:hidden">
           <table>
             <thead>
-              <tr><th>업장</th><th>예약자</th><th>방문일</th><th>인원</th><th>연락처</th><th>요청사항</th><th>상태</th><th>신청일</th></tr>
+              <tr><th>업장</th><th>예약자</th><th>방문 일시 (영업일 기준)</th><th>인원</th><th>연락처</th><th>요청사항</th><th>상태</th><th>신청일</th></tr>
             </thead>
             <tbody id="res-tbody"><tr><td colspan="8" class="loading">로딩 중...</td></tr></tbody>
           </table>
@@ -594,6 +595,63 @@ const CAT_LABEL = { edm:'EDM클럽', hiphop:'힙합', lounge:'라운지바', roo
 let allVenues = [];
 let editingVenueId = null;
 
+// ── 영업일 유틸 (나이트라이프 기준: 오전 08:00 전환) ────────────────
+const NIGHTLIFE_CUTOFF = 8;
+
+function _toDateStr(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${dd}`;
+}
+
+/**
+ * 현재 시각 기준 영업일 날짜를 반환합니다.
+ * 오전 08:00 이전이면 전날을 영업일로 간주합니다.
+ * 예: 5월25일 01:00 → 5월24일 영업일
+ */
+function getNightlifeDate(now = new Date()) {
+  const d = new Date(now);
+  if (d.getHours() < NIGHTLIFE_CUTOFF) d.setDate(d.getDate() - 1);
+  return _toDateStr(d);
+}
+
+/**
+ * 예약의 실제 영업일을 반환합니다.
+ * visit_time이 오전 08시 미만이면 reservation_date 전날이 영업일입니다.
+ * 예: reservation_date=5/25, visit_time=01:00 → 영업일은 5/24
+ */
+function getReservationBusinessDate(reservationDate, visitTime) {
+  if (!visitTime) return reservationDate;
+  const hour = parseInt(visitTime.split(':')[0], 10);
+  if (isNaN(hour)) return reservationDate;
+  if (hour < NIGHTLIFE_CUTOFF) {
+    const [y, m, d] = reservationDate.split('-').map(Number);
+    const dt = new Date(y, m - 1, d);
+    dt.setDate(dt.getDate() - 1);
+    return _toDateStr(dt);
+  }
+  return reservationDate;
+}
+
+/**
+ * 예약일+방문시각을 사람이 읽기 쉬운 형태로 반환합니다.
+ * 새벽 방문(08시 미만)이면 "익일(M/D) HH:00" 형태로 표시합니다.
+ * 예: reservation_date=5/24, visit_time=01:00 → "익일(5/25) 01:00"
+ */
+function formatVisitDateTime(reservationDate, visitTime) {
+  const [y, m, d] = reservationDate.split('-').map(Number);
+  if (!visitTime) return `${m}/${d}`;
+  const hour = parseInt(visitTime.split(':')[0], 10);
+  if (!isNaN(hour) && hour < NIGHTLIFE_CUTOFF) {
+    // 다음 날 방문 → 실제 캘린더 날짜는 reservationDate+1
+    const nextDay = new Date(y, m - 1, d + 1);
+    const nd = `${nextDay.getMonth() + 1}/${nextDay.getDate()}`;
+    return `<span style="color:var(--accent);font-weight:600">익일(${nd}) ${visitTime}</span>`;
+  }
+  return `${m}/${d} ${visitTime}`;
+}
+
 // ── 인증 ──────────────────────────────────────────────────────────
 const ADMIN_EMAIL = 'kahn201130@gmail.com';
 
@@ -658,6 +716,14 @@ async function loadDashboard() {
   document.getElementById('stat-reservations').textContent = rSnap.size;
   document.getElementById('stat-pending').textContent      = res.filter(r => r.status === 'pending').length;
 
+  // ── 오늘 방문 예정 (영업일 기준, confirmed만 집계) ─────────────────
+  const todayBiz = getNightlifeDate();
+  const todayVisitors = res.filter(r =>
+    r.status === 'confirmed' &&
+    getReservationBusinessDate(r.reservation_date, r.visit_time) === todayBiz
+  );
+  document.getElementById('stat-today-visits').textContent = todayVisitors.length;
+
   // 최근 예약 10건
   const venueMap = {};
   vSnap.docs.forEach(d => { venueMap[d.id] = d.data().name; });
@@ -667,11 +733,11 @@ async function loadDashboard() {
     .slice(0, 10);
   document.getElementById('recent-res-list').innerHTML = recent.length === 0
     ? '<div class="empty">예약 없음</div>'
-    : `<table><thead><tr><th>업장</th><th>예약자</th><th>방문일</th><th>인원</th><th>상태</th></tr></thead><tbody>
+    : `<table><thead><tr><th>업장</th><th>예약자</th><th>방문 일시 (영업일 기준)</th><th>인원</th><th>상태</th></tr></thead><tbody>
         ${recent.map(r => `<tr>
           <td>${venueMap[r.venue_id] ?? '-'}</td>
           <td>${r.contact_name}</td>
-          <td>${r.reservation_date}</td>
+          <td>${formatVisitDateTime(r.reservation_date, r.visit_time ?? null)}</td>
           <td>${r.party_size}명</td>
           <td>${statusBadge(r.status)}</td>
         </tr>`).join('')}
@@ -855,7 +921,7 @@ window.loadReservations = async () => {
     <tr>
       <td>${venueMap[r.venue_id] ?? '-'}</td>
       <td><strong>${r.contact_name}</strong></td>
-      <td>${r.reservation_date}</td>
+      <td>${formatVisitDateTime(r.reservation_date, r.visit_time ?? null)}</td>
       <td>${r.party_size}명</td>
       <td>${r.contact_phone}</td>
       <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.special_requests ?? '-'}</td>

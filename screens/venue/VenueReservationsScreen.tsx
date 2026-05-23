@@ -13,6 +13,10 @@ import { useAuth } from '../../contexts/AuthContext';
 import { Colors, Spacing, BorderRadius, Typography } from '../../constants/theme';
 import { sendPushNotification, getProfilePushToken } from '../../lib/notifications';
 import { sendReservationConfirmedAlimtalk, sendReservationCancelledAlimtalk } from '../../lib/solapi';
+import {
+  getNightlifeDate, getReservationBusinessDate,
+  getBusinessDayLabel, formatVisitDateTime,
+} from '../../lib/nightlifeDate';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../../types';
 
@@ -26,10 +30,12 @@ function formatDate(dateStr: string, withDow = true) {
   return `${d.getMonth() + 1}월 ${d.getDate()}일 (${dow})`;
 }
 
-function getTodayStr()    { return new Date().toISOString().split('T')[0]; }
-function getTomorrowStr() {
-  const d = new Date(); d.setDate(d.getDate() + 1);
-  return d.toISOString().split('T')[0];
+function getNightlifeTomorrowStr() {
+  // 영업일 기준 "내일" = 오늘 영업일 + 1
+  const today = getNightlifeDate();
+  const d = new Date(today + 'T12:00:00');
+  d.setDate(d.getDate() + 1);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
 
 function formatCreatedAt(ts: any) {
@@ -79,6 +85,8 @@ function ResCard({
       </View>
 
       <View style={styles.detailBox}>
+        {/* 날짜+시각 항상 명시 표시 — "익일(5/25) 01:00" 처럼 보여 혼동 방지 */}
+        <DRow icon="calendar-outline"  label="방문 일시"  value={formatVisitDateTime(item.reservation_date, item.visit_time)} />
         <DRow icon="call-outline"      label="연락처"    value={item.contact_phone} />
         {item.special_requests ? (
           <DRow icon="chatbubble-outline" label="요청사항" value={item.special_requests} />
@@ -134,8 +142,9 @@ export default function VenueReservationsScreen({ navigation }: Props) {
   const [refreshing, setRefreshing] = useState(false);
   const [processing, setProcessing] = useState<string | null>(null);
 
-  const today    = getTodayStr();
-  const tomorrow = getTomorrowStr();
+  // ⚠️ 나이트라이프 영업일 기준 (00:00~07:59 = 전날 영업일)
+  const today    = getNightlifeDate();
+  const tomorrow = getNightlifeTomorrowStr();
 
   const fetchData = useCallback(async () => {
     if (!profile) return;
@@ -164,18 +173,35 @@ export default function VenueReservationsScreen({ navigation }: Props) {
     const cancelled = all.filter(r => r.status === 'cancelled')
                          .sort((a, b) => (b.created_at?.seconds ?? 0) - (a.created_at?.seconds ?? 0));
 
-    // 오늘 / 내일 / 이후 분류
-    const todayList    = confirmed.filter(r => r.reservation_date === today)
-                                  .sort((a, b) => a.contact_name?.localeCompare(b.contact_name));
-    const tomorrowList = confirmed.filter(r => r.reservation_date === tomorrow)
-                                  .sort((a, b) => a.contact_name?.localeCompare(b.contact_name));
-    const futureConf   = confirmed.filter(r => r.reservation_date > tomorrow)
-                                  .sort((a, b) => a.reservation_date?.localeCompare(b.reservation_date));
+    // ── 영업일 기준 오늘 / 내일 / 이후 분류 ──────────────────────
+    // getReservationBusinessDate: 새벽(00~07:59) 방문 예약을 전날 영업일로 귀속
+    const sortByVisitTime = (a: any, b: any) => {
+      const ta = a.visit_time ?? '99:99';
+      const tb = b.visit_time ?? '99:99';
+      return ta.localeCompare(tb);
+    };
+    const todayList    = confirmed
+      .filter(r => getReservationBusinessDate(r.reservation_date, r.visit_time) === today)
+      .sort(sortByVisitTime);
+    const tomorrowList = confirmed
+      .filter(r => getReservationBusinessDate(r.reservation_date, r.visit_time) === tomorrow)
+      .sort(sortByVisitTime);
+    const futureConf   = confirmed
+      .filter(r => {
+        const bd = getReservationBusinessDate(r.reservation_date, r.visit_time);
+        return bd > tomorrow;
+      })
+      .sort((a, b) => {
+        const ba = getReservationBusinessDate(a.reservation_date, a.visit_time);
+        const bb = getReservationBusinessDate(b.reservation_date, b.visit_time);
+        return ba.localeCompare(bb) || (a.visit_time ?? '').localeCompare(b.visit_time ?? '');
+      });
 
-    // 이후 확정 예약: 날짜별 그룹화
+    // 이후 확정 예약: 영업일별 그룹화
     const byDate: Record<string, any[]> = {};
     futureConf.forEach(r => {
-      (byDate[r.reservation_date] ??= []).push(r);
+      const bd = getReservationBusinessDate(r.reservation_date, r.visit_time);
+      (byDate[bd] ??= []).push(r);
     });
 
     const result: { key: string; title: string; count: number; people?: number; data: any[]; showActions?: boolean }[] = [];
@@ -192,7 +218,7 @@ export default function VenueReservationsScreen({ navigation }: Props) {
     if (todayList.length > 0) {
       result.push({
         key: 'today',
-        title: `오늘 방문 예정  ${formatDate(today, false)}`,
+        title: `오늘 방문 예정  ${formatDate(today, false)}  (영업일 기준)`,
         count: todayList.length,
         people: todayList.reduce((s, r) => s + (r.party_size ?? 1), 0),
         data: todayList,
@@ -202,18 +228,18 @@ export default function VenueReservationsScreen({ navigation }: Props) {
     if (tomorrowList.length > 0) {
       result.push({
         key: 'tomorrow',
-        title: `내일 방문 예정  ${formatDate(tomorrow, false)}`,
+        title: `내일 방문 예정  ${formatDate(tomorrow, false)}  (영업일 기준)`,
         count: tomorrowList.length,
         people: tomorrowList.reduce((s, r) => s + (r.party_size ?? 1), 0),
         data: tomorrowList,
         showActions: false,
       });
     }
-    // 날짜별 그룹 섹션
-    Object.entries(byDate).forEach(([date, items]) => {
+    // 영업일별 그룹 섹션
+    Object.entries(byDate).forEach(([bizDate, items]) => {
       result.push({
-        key: `conf_${date}`,
-        title: formatDate(date),
+        key: `conf_${bizDate}`,
+        title: `${getBusinessDayLabel(bizDate)}  ${formatDate(bizDate, false)}`,
         count: items.length,
         people: items.reduce((s, r) => s + (r.party_size ?? 1), 0),
         data: items,
@@ -234,9 +260,15 @@ export default function VenueReservationsScreen({ navigation }: Props) {
   }, [all, today, tomorrow]);
 
   // ── 요약 카드 ─────────────────────────────────────────────────
-  const pending   = all.filter(r => r.status === 'pending').length;
-  const todayCnt  = all.filter(r => r.status === 'confirmed' && r.reservation_date === today);
-  const tomorrowCnt = all.filter(r => r.status === 'confirmed' && r.reservation_date === tomorrow);
+  const pending     = all.filter(r => r.status === 'pending').length;
+  const todayCnt    = all.filter(r =>
+    r.status === 'confirmed' &&
+    getReservationBusinessDate(r.reservation_date, r.visit_time) === today
+  );
+  const tomorrowCnt = all.filter(r =>
+    r.status === 'confirmed' &&
+    getReservationBusinessDate(r.reservation_date, r.visit_time) === tomorrow
+  );
 
   // ── 확정 처리 ────────────────────────────────────────────────
   function handleConfirm(item: any) {

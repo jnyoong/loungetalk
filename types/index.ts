@@ -73,7 +73,8 @@ export interface Reservation {
   venue_id: string;
   venue?: Venue;
   user_id: string;
-  reservation_date: string;
+  reservation_date: string;       // "YYYY-MM-DD" (달력 날짜)
+  visit_time?: string | null;     // "HH:00" — 없으면 영업일 기준 reservation_date 그대로
   party_size: number;
   contact_name: string;
   contact_phone: string;

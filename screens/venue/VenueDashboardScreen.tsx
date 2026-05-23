@@ -13,6 +13,7 @@ import { db } from '../../lib/firebase';
 import { useAuth } from '../../contexts/AuthContext';
 import { Colors, Spacing, BorderRadius, Typography } from '../../constants/theme';
 import { sendPushNotification, getProfilePushToken } from '../../lib/notifications';
+import { getNightlifeDate, getReservationBusinessDate, formatVisitDateTime } from '../../lib/nightlifeDate';
 import type { RootStackParamList } from '../../types';
 
 export default function VenueDashboardScreen() {
@@ -38,7 +39,9 @@ export default function VenueDashboardScreen() {
     setVenue(venueData);
 
     if (venueData) {
-      const today = new Date().toISOString().split('T')[0];
+      // ⚠️ 나이트라이프 영업일 기준 "오늘" (00:00~07:59 = 전날 영업일)
+      const todayBizDate = getNightlifeDate();
+
       const resSnap = await getDocs(query(
         collection(db, 'reservations'),
         where('venue_id', '==', venueData.id),
@@ -50,10 +53,19 @@ export default function VenueDashboardScreen() {
         .filter((r: any) => r.status === 'pending')
         .sort((a: any, b: any) => (b.created_at?.seconds ?? 0) - (a.created_at?.seconds ?? 0));
 
-      // 오늘 방문 확정 예약 (이름순)
+      // 오늘 방문 확정 예약 — 영업일 기준으로 비교
+      // 예) 5/25 01:00 방문 예약 → 영업일 5/24 → "오늘"(5/24 영업 중)에 포함
       const todayRes = allRes
-        .filter((r: any) => r.status === 'confirmed' && r.reservation_date === today)
-        .sort((a: any, b: any) => (a.contact_name ?? '').localeCompare(b.contact_name ?? ''));
+        .filter((r: any) =>
+          r.status === 'confirmed' &&
+          getReservationBusinessDate(r.reservation_date, r.visit_time) === todayBizDate
+        )
+        .sort((a: any, b: any) => {
+          // 방문 시각 오름차순 (없으면 뒤로)
+          const ta = a.visit_time ?? '99:99';
+          const tb = b.visit_time ?? '99:99';
+          return ta.localeCompare(tb);
+        });
 
       setReservations(pendingRes);
       setTodayConfirmed(todayRes);
@@ -157,6 +169,10 @@ export default function VenueDashboardScreen() {
                     </View>
                     <View style={styles.todayInfo}>
                       <Text style={styles.todayName}>{r.contact_name}</Text>
+                      {/* 날짜+시각 항상 명시 — "익일(5/25) 01:00" 처럼 표시하여 혼동 방지 */}
+                      <Text style={styles.todayDateTime}>
+                        📅 {formatVisitDateTime(r.reservation_date, r.visit_time)}
+                      </Text>
                       <Text style={styles.todayPhone}>{r.contact_phone}</Text>
                       {r.special_requests ? (
                         <Text style={styles.todayReq} numberOfLines={1}>{r.special_requests}</Text>
@@ -368,6 +384,7 @@ const styles = StyleSheet.create({
   todayPartyUnit: { fontSize: 11, fontWeight: '600', color: Colors.accent },
   todayInfo: { flex: 1, gap: 3 },
   todayName: { fontSize: 15, fontWeight: '700', color: Colors.textPrimary },
+  todayDateTime: { fontSize: 12, fontWeight: '600', color: Colors.accent },
   todayPhone: { fontSize: 12, color: Colors.textSecondary },
   todayReq: { fontSize: 11, color: Colors.textMuted, fontStyle: 'italic' },
 
