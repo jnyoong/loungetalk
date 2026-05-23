@@ -10,6 +10,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { useAuth } from '../../contexts/AuthContext';
+import { sendPushNotification, getProfilePushToken } from '../../lib/notifications';
 import { Colors, Spacing, BorderRadius, Typography } from '../../constants/theme';
 import { REGIONS } from '../../constants/regions';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -180,6 +181,22 @@ export default function MyReservationsScreen({ navigation }: Props) {
           style: 'destructive',
           onPress: async () => {
             await updateDoc(doc(db, 'reservations', item.id), { status: 'cancelled' });
+
+            // 업주에게 취소 알림 전송 (비차단)
+            const ownerId = item.venue?.owner_id;
+            if (ownerId) {
+              getProfilePushToken(ownerId).then(token => {
+                if (token) {
+                  sendPushNotification({
+                    to: token,
+                    title: '예약이 취소되었습니다',
+                    body: `${item.contact_name} (${item.party_size}명) · ${formatVisitDate(item.reservation_date)} 예약을 취소했습니다.`,
+                    data: { type: 'reservation_cancelled_by_guest', reservationId: item.id },
+                  }).catch(() => {});
+                }
+              }).catch(() => {});
+            }
+
             await fetchData();
           },
         },
