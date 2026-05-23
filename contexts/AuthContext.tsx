@@ -38,13 +38,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // 앱 시작 시 저장된 로그인 정보 복원
   useEffect(() => {
-    getStoredUser().then(async (stored) => {
-      if (stored) {
-        setUser(stored);
-        await fetchProfile(stored.uid);
-      }
-      setLoading(false);
-    });
+    getStoredUser()
+      .then(async (stored) => {
+        if (stored) {
+          setUser(stored);
+          await fetchProfile(stored.uid);
+        }
+      })
+      .catch(() => {
+        // AsyncStorage 또는 Firebase 오류 시에도 반드시 로딩 해제
+      })
+      .finally(() => {
+        setLoading(false);
+      });
   }, []);
 
   async function fetchProfile(uid: string): Promise<UserProfile | null> {
