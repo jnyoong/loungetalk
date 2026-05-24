@@ -17,15 +17,22 @@ import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db } from './firebase';
 
 // ── 포그라운드 알림 핸들러 ────────────────────────────────────────
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert:  true,
-    shouldPlaySound:  true,
-    shouldSetBadge:   true,
-    shouldShowBanner: true,
-    shouldShowList:   true,
-  }),
-});
+// 앱 시작 시 App.tsx에서 호출 (모듈 최상단 실행 금지 — 신규 아키텍처 호환 문제)
+export function initNotificationHandler() {
+  try {
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowAlert:  true,
+        shouldPlaySound:  true,
+        shouldSetBadge:   true,
+        shouldShowBanner: true,
+        shouldShowList:   true,
+      }),
+    });
+  } catch (e) {
+    console.warn('[알림] 핸들러 등록 실패 (무시):', e);
+  }
+}
 
 /** EAS Project ID 가져오기 */
 function getProjectId(): string | undefined {
